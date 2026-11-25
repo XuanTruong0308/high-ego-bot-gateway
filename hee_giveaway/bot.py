@@ -307,9 +307,9 @@ bot = BountyBot()
     giai_thuong='Tên phần quà (VD: 50k VNĐ, Thẻ Garena 100k, Nitro)',
     thoi_gian='Thời gian đếm ngược (VD: 10m, 2h, 24h, 3d)',
     so_nguoi_trung='Số lượng người trúng giải (mặc định: 1)',
-    level_yeu_cau='Level Rank tối thiểu từ bot Chronicle (0 để không yêu cầu)',
-    tuoi_acc_ngay='Tuổi tài khoản Discord tối thiểu (mặc định: 7 ngày)',
-    gio_vao_server='Thời gian tối thiểu ở trong server (mặc định: 24 giờ)',
+    level_yeu_cau='Level Rank tối thiểu từ bot Chronicle (mặc định: 0)',
+    tuoi_acc_ngay='Tuổi tài khoản Discord tối thiểu (mặc định: 90 ngày / 3 tháng)',
+    gio_vao_server='Thời gian tối thiểu ở trong server (mặc định: 0 - không bắt buộc)',
     role_yeu_cau='Role bắt buộc phải có để tham gia',
     thuong_diem_vault='Số Điểm Vault tự động cộng thẳng vào ví người thắng (0 nếu là quà ngoài)',
     kenh='Kênh đăng bài giveaway (mặc định: kênh hiện tại)'
@@ -320,8 +320,8 @@ async def cmd_giveaway_start(
     thoi_gian: str,
     so_nguoi_trung: int = 1,
     level_yeu_cau: int = 0,
-    tuoi_acc_ngay: int = 7,
-    gio_vao_server: int = 24,
+    tuoi_acc_ngay: int = 90,
+    gio_vao_server: int = 0,
     role_yeu_cau: Optional[discord.Role] = None,
     thuong_diem_vault: float = 0,
     kenh: Optional[discord.TextChannel] = None

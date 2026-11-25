@@ -51,8 +51,8 @@ def create_giveaway(
     end_time: float,
     host_id: int,
     min_level: int = 0,
-    min_account_age_days: int = 7,
-    min_server_stay_hours: int = 24,
+    min_account_age_days: int = 90,
+    min_server_stay_hours: int = 0,
     required_role_id: Optional[int] = None,
     is_vault_points: int = 0,
     vault_points_amount: float = 0

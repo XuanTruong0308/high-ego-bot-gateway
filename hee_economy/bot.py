@@ -66,43 +66,44 @@ def has_he_role(member: discord.Member) -> bool:
         return True
     return any(r.name == HE_ROLE_NAME or str(r.id) == HE_ROLE_NAME for r in member.roles)
 
-def verify_anti_clone(member: discord.Member, guild_id: int) -> tuple[bool, str]:
-    """Kiểm tra điều kiện chống tài khoản ảo tham gia Daily."""
-    now_utc = datetime.now(timezone.utc)
-    
-    # 1. Tuổi tài khoản Discord: Tối thiểu 7 ngày
-    if member.created_at:
-        acc_age_days = (now_utc - member.created_at).days
-        if acc_age_days < 7:
-            return False, f"🛡️ **Chống clone mới tạo:** Tài khoản Discord của bạn mới lập được **{acc_age_days} ngày** (Yêu cầu tối thiểu: **7 ngày** để nhận Daily)!"
-            
-    # 2. Thời gian tham gia Server HEe: Tối thiểu 24 giờ
-    if member.joined_at:
-        join_hours = (now_utc - member.joined_at).total_seconds() / 3600
-        if join_hours < 24:
-            remain_h = max(1, int(24 - join_hours))
-            return False, f"⏳ **Chống clone vừa vào server:** Bạn cần tham gia server tối thiểu **24 giờ** trước khi bắt đầu Daily (Còn thiếu khoảng {remain_h} giờ)!"
-
-    # 3. Hoạt động thực tế: Đọc database rank xem đã có tương tác chưa
+def get_user_rank_level(user_id: int, guild_id: int) -> tuple[float, int]:
+    """Trả về (xp, level) từ rank.db của bot Chronicle. Level = int(xp // 100)"""
     rank_paths = [
         Path('/rank_data/rank.db'),
         Path(__file__).parent.parent / 'hee_rank' / 'data' / 'rank.db',
     ]
     db_file = next((p for p in rank_paths if p.exists()), None)
-    if db_file:
-        try:
-            with sqlite3.connect(db_file) as conn:
-                cursor = conn.cursor()
-                cursor.execute(
-                    "SELECT xp, total_messages, total_voice_min FROM members WHERE user_id = ? AND guild_id = ?",
-                    (str(member.id), str(guild_id))
-                )
-                row = cursor.fetchone()
-                if not row or (row[0] < 20 and row[1] < 3 and row[2] < 2):
-                    return False, "💬 **Chống nick ảo offline:** Bạn cần tương tác tối thiểu trong server (gửi ít nhất 3 tin nhắn hoặc tham gia voice 2 phút) để chứng minh là người dùng thật trước khi nhận Daily!"
-        except Exception as e:
-            logger.warning(f"Lỗi kiểm tra rank.db anti-clone: {e}")
+    if not db_file:
+        return 0.0, 0
+    try:
+        with sqlite3.connect(db_file) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT xp FROM members WHERE user_id = ? AND guild_id = ?",
+                (str(user_id), str(guild_id))
+            )
+            row = cursor.fetchone()
+            if row:
+                xp = float(row[0])
+                level = max(0, int(xp // 100))
+                return xp, level
+    except Exception as e:
+        logger.warning(f"Lỗi đọc level rank: {e}")
+    return 0.0, 0
 
+def verify_anti_clone(member: discord.Member) -> tuple[bool, str]:
+    """Kiểm tra điều kiện chống tài khoản ảo tham gia Daily: Acc Discord từ 3 tháng trở lên."""
+    now_utc = datetime.now(timezone.utc)
+    
+    # Tài khoản Discord phải từ 3 tháng trở lên (≥ 90 ngày)
+    if member.created_at:
+        acc_age_days = (now_utc - member.created_at).days
+        if acc_age_days < 90:
+            return False, (
+                f"🛡️ **Chống nick ảo:** Tài khoản Discord của bạn mới lập được **{acc_age_days} ngày**!\n"
+                f"Server yêu cầu tài khoản Discord phải hoạt động từ **3 tháng trở lên (≥ 90 ngày)** mới được phép điểm danh Daily."
+            )
+            
     return True, ""
 
 class VaultBot(commands.Bot):
@@ -138,7 +139,7 @@ async def cmd_daily(interaction: discord.Interaction):
 
     member = interaction.user
     if isinstance(member, discord.Member):
-        valid, anti_msg = verify_anti_clone(member, interaction.guild_id)
+        valid, anti_msg = verify_anti_clone(member)
         if not valid:
             await interaction.response.send_message(f'❌ {member.mention}\n{anti_msg}', ephemeral=True)
             return
@@ -154,7 +155,7 @@ async def cmd_daily(interaction: discord.Interaction):
             f'Chúc mừng {interaction.user.mention}!\n'
             f'{msg}\n\n'
             f'💰 **Số dư hiện tại:** `{new_balance:.1f} Điểm` ({int(new_balance * 1000):,} VNĐ)\n'
-            f'📌 *Tích đủ tối thiểu 50 Điểm (50k) và tối đa 100 Điểm (100k) để mở ticket quy đổi tiền thật.*'
+            f'📌 *Điều kiện rút tiền: Tích lũy tối thiểu 50 Điểm (50k) và đạt tối thiểu **Rank Level 10** trong server.*'
         ),
         color=COLOR_RED,
         timestamp=datetime.now()
@@ -163,13 +164,16 @@ async def cmd_daily(interaction: discord.Interaction):
     embed.set_footer(text='High Ego eSport • Quỹ Thưởng Thành Viên')
     await interaction.response.send_message(embed=embed)
 
-@bot.tree.command(name='balance', description='Xem số dư điểm thưởng và lịch sử vi phạm của bạn')
+@bot.tree.command(name='balance', description='Xem số dư điểm thưởng, cấp độ Rank và trạng thái rút tiền của bạn')
 @app_commands.describe(thanh_vien='Thành viên muốn tra cứu (mặc định: chính bạn)')
 async def cmd_balance(interaction: discord.Interaction, thanh_vien: discord.Member = None):
     target = thanh_vien or interaction.user
     user = economy_db.get_user(target.id, interaction.guild_id)
     points = user['points']
     strikes = user['strike_count']
+
+    # Lấy Rank Level từ bot Chronicle
+    xp, level = get_user_rank_level(target.id, interaction.guild_id)
 
     embed = discord.Embed(
         title=f'💳 Tài Khoản Thưởng — {target.display_name}',
@@ -179,14 +183,29 @@ async def cmd_balance(interaction: discord.Interaction, thanh_vien: discord.Memb
     embed.set_thumbnail(url=target.display_avatar.url)
     embed.add_field(name='💰 Số Dư Điểm', value=f'**{points:.1f} Điểm**', inline=True)
     embed.add_field(name='💵 Quy Đổi VNĐ', value=f'**{int(points * 1000):,} VNĐ**', inline=True)
+    embed.add_field(name='🎖️ Cấp Độ Rank', value=f'**Level {level}** (`{xp:,.0f} XP`)', inline=True)
     embed.add_field(name='⚠️ Cảnh Cáo Vi Phạm', value=f'{strikes} lần', inline=True)
 
-    status_str = "Chưa đủ điều kiện rút (Cần tối thiểu 50 Điểm)"
+    # Điều kiện rút tiền: Điểm >= 50 VÀ Level >= 10
     if points >= 50.0:
-        status_str = "✅ Đủ điều kiện tạo ticket quy đổi!"
+        if level >= 10:
+            status_str = f"✅ **ĐỦ ĐIỀU KIỆN RÚT TIỀN!**\nBạn đã đạt `{points:.1f} Điểm` và Rank **Level {level}** (≥ Level 10). Hãy mở ticket hỗ trợ để nhận tiền mặt!"
+        else:
+            status_str = (
+                f"🔒 **CHƯA ĐƯỢC PHÉP RÚT TIỀN:**\n"
+                f"Bạn đã có đủ `{points:.1f} Điểm` nhưng Rank hiện tại mới đạt **Level {level}/10**.\n"
+                f"👉 *Yêu cầu: Phải đạt tối thiểu **Rank Level 10** (tích cực chat & voice) mới được rút tiền!*"
+            )
+    else:
+        remain_pts = 50.0 - points
+        status_str = (
+            f"⏳ **Chưa đủ điều kiện rút:**\n"
+            f"- Cần thêm: `{remain_pts:.1f} Điểm` (Đạt tối thiểu 50k VNĐ)\n"
+            f"- Yêu cầu Rank: **Level 10** (Hiện tại: `Level {level}/10`)"
+        )
 
-    embed.add_field(name='Trạng Thái Quy Đổi', value=status_str, inline=False)
-    embed.set_footer(text='HEe Vault • 1 Điểm = 1,000 VNĐ')
+    embed.add_field(name='Trạng Thái Quy Đổi Tiền Mặt', value=status_str, inline=False)
+    embed.set_footer(text='HEe Vault • 1 Điểm = 1,000 VNĐ • Điều kiện rút: Min 50 Điểm & Rank Level 10')
     await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name='point-add', description='[Founder Only] Cộng hoặc trừ điểm thành viên kèm lý do bắt buộc')
