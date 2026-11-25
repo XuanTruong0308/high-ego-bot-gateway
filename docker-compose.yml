@@ -1,0 +1,30 @@
+services:
+  gatekeeper:
+    build:
+      context: ./hee_welcome_builder
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./hee_welcome_builder/.env
+    volumes:
+      - ./hee_welcome_builder/data:/app/data
+
+  chronicle:
+    build:
+      context: ./hee_rank
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./hee_rank/.env
+    volumes:
+      - ./hee_rank/data:/app/data
+
+  sentinel:
+    build:
+      context: ./hee_mod
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./hee_mod/.env
+    volumes:
+      - ./hee_mod/logs:/app/logs
