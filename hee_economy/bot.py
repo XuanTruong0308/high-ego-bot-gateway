@@ -9,7 +9,8 @@ bot.py — HEe • Vault (P5 - Economy & Daily Bot)
 import os
 import sys
 import logging
-from datetime import datetime
+import sqlite3
+from datetime import datetime, timezone
 
 import discord
 from discord import app_commands
@@ -43,6 +44,7 @@ logger = logging.getLogger('HEe.Vault')
 BOT_TOKEN        = os.getenv('BOT_TOKEN', '')
 GUILD_ID         = int(os.getenv('GUILD_ID', '0'))
 HE_ROLE_NAME     = os.getenv('HE_ROLE_NAME', 'HE')
+OWNER_USER_ID    = os.getenv('OWNER_USER_ID', '1147375213634388008')
 DAILY_CHANNEL_ID = int(os.getenv('DAILY_CHANNEL_ID', '0'))
 AUDIT_LOG_ID     = int(os.getenv('AUDIT_LOG_CHANNEL_ID', '0'))
 
@@ -51,10 +53,57 @@ COLOR_DARK = 0x881337
 
 intents = discord.Intents.default()
 
+def is_founder(member: discord.Member) -> bool:
+    """Chỉ duy nhất Founder (ID bạn hoặc Server Owner) mới được phép thực thi."""
+    if str(member.id) == OWNER_USER_ID or member.id == 1147375213634388008:
+        return True
+    if member.guild and member.guild.owner_id == member.id:
+        return True
+    return False
+
 def has_he_role(member: discord.Member) -> bool:
     if member.guild_permissions.administrator:
         return True
     return any(r.name == HE_ROLE_NAME or str(r.id) == HE_ROLE_NAME for r in member.roles)
+
+def verify_anti_clone(member: discord.Member, guild_id: int) -> tuple[bool, str]:
+    """Kiểm tra điều kiện chống tài khoản ảo tham gia Daily."""
+    now_utc = datetime.now(timezone.utc)
+    
+    # 1. Tuổi tài khoản Discord: Tối thiểu 7 ngày
+    if member.created_at:
+        acc_age_days = (now_utc - member.created_at).days
+        if acc_age_days < 7:
+            return False, f"🛡️ **Chống clone mới tạo:** Tài khoản Discord của bạn mới lập được **{acc_age_days} ngày** (Yêu cầu tối thiểu: **7 ngày** để nhận Daily)!"
+            
+    # 2. Thời gian tham gia Server HEe: Tối thiểu 24 giờ
+    if member.joined_at:
+        join_hours = (now_utc - member.joined_at).total_seconds() / 3600
+        if join_hours < 24:
+            remain_h = max(1, int(24 - join_hours))
+            return False, f"⏳ **Chống clone vừa vào server:** Bạn cần tham gia server tối thiểu **24 giờ** trước khi bắt đầu Daily (Còn thiếu khoảng {remain_h} giờ)!"
+
+    # 3. Hoạt động thực tế: Đọc database rank xem đã có tương tác chưa
+    rank_paths = [
+        Path('/rank_data/rank.db'),
+        Path(__file__).parent.parent / 'hee_rank' / 'data' / 'rank.db',
+    ]
+    db_file = next((p for p in rank_paths if p.exists()), None)
+    if db_file:
+        try:
+            with sqlite3.connect(db_file) as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT xp, total_messages, total_voice_min FROM members WHERE user_id = ? AND guild_id = ?",
+                    (str(member.id), str(guild_id))
+                )
+                row = cursor.fetchone()
+                if not row or (row[0] < 20 and row[1] < 3 and row[2] < 2):
+                    return False, "💬 **Chống nick ảo offline:** Bạn cần tương tác tối thiểu trong server (gửi ít nhất 3 tin nhắn hoặc tham gia voice 2 phút) để chứng minh là người dùng thật trước khi nhận Daily!"
+        except Exception as e:
+            logger.warning(f"Lỗi kiểm tra rank.db anti-clone: {e}")
+
+    return True, ""
 
 class VaultBot(commands.Bot):
     def __init__(self):
@@ -86,6 +135,13 @@ async def cmd_daily(interaction: discord.Interaction):
             f'❌ Bạn chỉ có thể điểm danh tại kênh <#{DAILY_CHANNEL_ID}>!', ephemeral=True
         )
         return
+
+    member = interaction.user
+    if isinstance(member, discord.Member):
+        valid, anti_msg = verify_anti_clone(member, interaction.guild_id)
+        if not valid:
+            await interaction.response.send_message(f'❌ {member.mention}\n{anti_msg}', ephemeral=True)
+            return
 
     success, msg, new_balance = economy_db.claim_daily(interaction.user.id, interaction.guild_id)
     if not success:
@@ -133,7 +189,7 @@ async def cmd_balance(interaction: discord.Interaction, thanh_vien: discord.Memb
     embed.set_footer(text='HEe Vault • 1 Điểm = 1,000 VNĐ')
     await interaction.response.send_message(embed=embed)
 
-@bot.tree.command(name='point-add', description='[Role HE / Admin] Cộng hoặc trừ điểm thành viên kèm lý do bắt buộc')
+@bot.tree.command(name='point-add', description='[Founder Only] Cộng hoặc trừ điểm thành viên kèm lý do bắt buộc')
 @app_commands.describe(
     thanh_vien='Thành viên cần điều chỉnh điểm',
     so_diem='Số điểm cần thay đổi (dương để cộng, âm để trừ)',
@@ -141,8 +197,8 @@ async def cmd_balance(interaction: discord.Interaction, thanh_vien: discord.Memb
 )
 async def cmd_point_add(interaction: discord.Interaction, thanh_vien: discord.Member, so_diem: float, ly_do: str):
     member = interaction.user
-    if not isinstance(member, discord.Member) or not has_he_role(member):
-        await interaction.response.send_message('❌ Bạn phải có **Role HE** hoặc là **Administrator** mới được dùng lệnh này!', ephemeral=True)
+    if not isinstance(member, discord.Member) or not is_founder(member):
+        await interaction.response.send_message('❌ Lệnh này được khóa độc quyền! Chỉ có **Chủ sở hữu server (Founder)** mới có quyền cấp/trừ điểm thưởng.', ephemeral=True)
         return
 
     if not ly_do or len(ly_do.strip()) < 3:
@@ -243,7 +299,7 @@ async def cmd_event_announce(
     modal = EventAnnounceModal(target_channel=target_channel)
     await interaction.response.send_modal(modal)
 
-@bot.tree.command(name='point-reset', description='[Role HE / Admin] Đưa điểm hoặc số lần vi phạm của thành viên về 0')
+@bot.tree.command(name='point-reset', description='[Founder Only] Đưa điểm hoặc số lần vi phạm của thành viên về 0')
 @app_commands.describe(
     thanh_vien='Thành viên cần reset',
     loai_reset='Chọn mục muốn reset về 0',
@@ -258,8 +314,8 @@ async def cmd_event_announce(
 )
 async def cmd_point_reset(interaction: discord.Interaction, thanh_vien: discord.Member, loai_reset: str, ly_do: str):
     member = interaction.user
-    if not isinstance(member, discord.Member) or not has_he_role(member):
-        await interaction.response.send_message('❌ Bạn phải có **Role HE** hoặc là **Administrator** mới được dùng lệnh này!', ephemeral=True)
+    if not isinstance(member, discord.Member) or not is_founder(member):
+        await interaction.response.send_message('❌ Lệnh này được khóa độc quyền! Chỉ có **Chủ sở hữu server (Founder)** mới có quyền reset điểm hoặc xóa lịch sử vi phạm.', ephemeral=True)
         return
 
     if not ly_do or len(ly_do.strip()) < 3:

@@ -49,3 +49,4 @@ services:
       - ./hee_economy/.env
     volumes:
       - ./shared_data:/shared_data
+      - ./hee_rank/data:/rank_data:ro
