@@ -63,11 +63,24 @@ services:
       - ./shared_data:/shared_data
       - ./hee_rank/data:/rank_data:ro
 
+  lavalink:
+    image: ghcr.io/lavalink-devs/lavalink:4
+    restart: unless-stopped
+    environment:
+      - _JAVA_OPTIONS=-Xmx512M
+    volumes:
+      - ./lavalink/application.yml:/opt/Lavalink/application.yml
+      - ./lavalink/plugins:/opt/Lavalink/plugins
+    ports:
+      - "2333:2333"
+
   beat:
     build:
       context: ./hee_music
       dockerfile: Dockerfile
     restart: unless-stopped
+    depends_on:
+      - lavalink
     env_file:
       - ./hee_music/.env
     volumes:
