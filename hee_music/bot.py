@@ -1,7 +1,7 @@
 """
 bot.py — HEe • Beat (Music Bot độc quyền cho Role HE với YouTube stream)
-- Hỗ trợ Prefix: he!p <link_ytb>, he!skip, he!pause, he!resume, he!stop, he!queue, he!repeat, he!leave
-- Hỗ trợ Slash: /play, /he-play, /skip, /pause, /resume, /stop, /queue, /repeat, /leave
+- Hỗ trợ Prefix: he!p <link_ytb>, he!skip, he!pause, he!resume, he!stop, he!queue, he!repeat, he!leave, he!i
+- Hỗ trợ Slash: /play, /he-play, /skip, /pause, /resume, /stop, /queue, /repeat, /leave, /info, /guide
 - Phân quyền: Độc quyền Role HE / Founder / Admin
 - Khóa phòng voice độc quyền: Đang phát tại phòng nào thì phòng khác KHÔNG ĐƯỢC PHÉP gọi bot hay can thiệp
 - Auto-leave: Tự động rời phòng và dọn dẹp sau 1 phút nếu phòng không còn ai
@@ -144,35 +144,6 @@ async def extract_youtube_info(url: str, requester: discord.Member) -> Optional[
         logger.error(f"Lỗi extract YouTube: {e}")
         return None
 
-# ─────────────────── BOT SETUP ───────────────────
-intents = discord.Intents.default()
-intents.guilds = True
-intents.messages = True
-intents.message_content = True
-intents.voice_states = True
-
-class BeatBot(commands.Bot):
-    def __init__(self):
-        super().__init__(command_prefix=['he!', 'HE!', 'he! '], intents=intents)
-
-    async def setup_hook(self):
-        guild = discord.Object(id=GUILD_ID)
-        self.tree.copy_global_to(guild=guild)
-        try:
-            synced = await self.tree.sync(guild=guild)
-            logger.info(f"Synced {len(synced)} slash command(s) vào guild {GUILD_ID}.")
-        except discord.Forbidden:
-            synced = await self.tree.sync()
-            logger.info(f"Synced {len(synced)} global slash command(s).")
-
-    async def on_ready(self):
-        logger.info(f"Logged in as {self.user} (ID: {self.user.id})")
-        await self.change_presence(
-            activity=discord.Activity(type=discord.ActivityType.listening, name="he!p <link_ytb> | Role HE")
-        )
-
-bot = BeatBot()
-
 # ─────────────────── VOICE HELPERS ───────────────────
 def check_voice_exclusivity(member: discord.Member, guild: discord.Guild) -> tuple[bool, str, Optional[discord.VoiceChannel]]:
     """
@@ -196,6 +167,181 @@ def check_voice_exclusivity(member: discord.Member, guild: discord.Guild) -> tup
             ), vc.channel
 
     return True, "", user_channel
+
+# ─────────────────── INTERACTIVE CONTROLS VIEW ───────────────────
+class MusicControlsView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if not is_authorized(interaction.user):
+            await interaction.response.send_message("❌ Thao tác này chỉ dành riêng cho thành viên có **Role HE**!", ephemeral=True)
+            return False
+        ok, err_msg, _ = check_voice_exclusivity(interaction.user, interaction.guild)
+        if not ok:
+            await interaction.response.send_message(err_msg, ephemeral=True)
+            return False
+        return True
+
+    @discord.ui.button(label="Tạm dừng / Tiếp tục", style=discord.ButtonStyle.secondary, emoji="⏯️", custom_id="hee_music:pause_resume")
+    async def pause_resume_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        vc = interaction.guild.voice_client
+        if not vc:
+            await interaction.response.send_message("⚠️ Bot không có trong phòng voice.", ephemeral=True)
+            return
+        if vc.is_playing():
+            vc.pause()
+            await interaction.response.send_message(f"⏸️ {interaction.user.mention} đã tạm dừng phát nhạc.")
+        elif vc.is_paused():
+            vc.resume()
+            await interaction.response.send_message(f"▶️ {interaction.user.mention} đã tiếp tục phát nhạc.")
+        else:
+            await interaction.response.send_message("⚠️ Hiện không có bài hát nào đang phát.", ephemeral=True)
+
+    @discord.ui.button(label="Bỏ qua", style=discord.ButtonStyle.primary, emoji="⏭️", custom_id="hee_music:skip")
+    async def skip_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        vc = interaction.guild.voice_client
+        if vc and (vc.is_playing() or vc.is_paused()):
+            vc.stop()
+            await interaction.response.send_message(f"⏭️ {interaction.user.mention} đã bỏ qua bài hát hiện tại!")
+        else:
+            await interaction.response.send_message("⚠️ Không có bài hát nào đang phát.", ephemeral=True)
+
+    @discord.ui.button(label="Lặp lại", style=discord.ButtonStyle.secondary, emoji="🔁", custom_id="hee_music:repeat")
+    async def repeat_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        manager = get_manager(interaction.guild.id)
+        manager.repeat = not manager.repeat
+        status = "BẬT" if manager.repeat else "TẮT"
+        await interaction.response.send_message(f"🔁 Chế độ lặp lại bài hát hiện tại: **{status}**")
+
+    @discord.ui.button(label="Hàng đợi", style=discord.ButtonStyle.secondary, emoji="📋", custom_id="hee_music:queue")
+    async def queue_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        manager = get_manager(interaction.guild.id)
+        if not manager.current and not manager.queue:
+            await interaction.response.send_message("📭 Hàng đợi hiện đang trống.", ephemeral=True)
+            return
+        lines = []
+        if manager.current:
+            lines.append(f"▶️ **Đang phát:** [{manager.current.title}]({manager.current.webpage_url}) (`{format_duration(manager.current.duration)}`)")
+        if manager.queue:
+            lines.append("\n**Danh sách kế tiếp:**")
+            for i, s in enumerate(list(manager.queue)[:10], 1):
+                lines.append(f"`{i}.` [{s.title}]({s.webpage_url}) (`{format_duration(s.duration)}`) | {s.requester.mention}")
+            if len(manager.queue) > 10:
+                lines.append(f"*... và còn {len(manager.queue) - 10} bài hát khác.*")
+        embed = discord.Embed(
+            title="📋 Danh Sách Nhạc Hàng Đợi",
+            description="\n".join(lines),
+            color=COLOR_RED
+        )
+        embed.set_footer(text=f"Tổng số bài: {len(manager.queue) + (1 if manager.current else 0)} • Lặp lại: {'Bật' if manager.repeat else 'Tắt'}")
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @discord.ui.button(label="Dừng & Rời", style=discord.ButtonStyle.danger, emoji="⏹️", custom_id="hee_music:stop")
+    async def stop_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        manager = get_manager(interaction.guild.id)
+        manager.clear()
+        vc = interaction.guild.voice_client
+        if vc and (vc.is_playing() or vc.is_paused()):
+            vc.stop()
+        if vc and vc.is_connected():
+            await vc.disconnect()
+            await interaction.response.send_message(f"⏹️ {interaction.user.mention} đã dừng nhạc, dọn dẹp hàng đợi và rời khỏi voice.")
+        else:
+            await interaction.response.send_message(f"⏹️ {interaction.user.mention} đã dọn dẹp toàn bộ hàng đợi.")
+
+# ─────────────────── GUIDE EMBED BUILDER ───────────────────
+def build_guide_embed(guild: Optional[discord.Guild] = None) -> discord.Embed:
+    embed = discord.Embed(
+        title="🎵 HEe • Beat — Hướng Dẫn Sử Dụng & Bảng Lệnh",
+        description=(
+            "**HEe • Beat** là hệ thống phát nhạc YouTube chất lượng cao độc quyền dành riêng cho thành viên mang **Role HE**, Ban Quản Trị và Founder tại **High Ego eSport**.\n\n"
+            "✨ *Chỉ chấp nhận link YouTube trực tiếp (Watch, Shorts, youtu.be).*"
+        ),
+        color=COLOR_RED,
+        timestamp=datetime.now(timezone.utc)
+    )
+    if guild and guild.icon:
+        embed.set_author(name=f"High Ego eSport • {guild.name}", icon_url=guild.icon.url)
+    else:
+        embed.set_author(name="High Ego eSport • HEe Beat")
+
+    embed.add_field(
+        name="🎶 1. Lệnh Phát Nhạc (Chỉ link YouTube)",
+        value=(
+            "• `he!p <link_ytb>` hoặc `/play <link_ytb>`: Kết nối vào phòng voice và phát bài hát.\n"
+            "• *Định dạng hỗ trợ: `youtube.com/watch?v=...`, `youtu.be/...`, `youtube.com/shorts/...`.*"
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="🎛️ 2. Lệnh Điều Khiển Trình Phát",
+        value=(
+            "• `he!pause` hoặc `/pause`: Tạm dừng bài hát đang phát.\n"
+            "• `he!resume` hoặc `/resume`: Tiếp tục phát nhạc.\n"
+            "• `he!skip` hoặc `/skip`: Bỏ qua bài hát hiện tại sang bài kế tiếp.\n"
+            "• `he!repeat` hoặc `/repeat`: Bật/Tắt chế độ lặp lại bài hát hiện tại.\n"
+            "• `he!stop` hoặc `/stop`: Dừng phát và xóa sạch toàn bộ hàng đợi.\n"
+            "• `he!leave` hoặc `/leave`: Yêu cầu bot rời khỏi phòng voice."
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="📋 3. Tra Cứu & Trợ Giúp",
+        value=(
+            "• `he!queue` hoặc `/queue`: Xem danh sách bài hát đang chờ phát.\n"
+            "• `he!i` (hoặc `he!info`, `/info`, `/guide`): Mở bảng hướng dẫn này kèm dàn nút bấm thao tác nhanh!"
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="🛡️ 4. Cơ Chế Độc Quyền & Tối Ưu Băng Thông",
+        value=(
+            "🔒 **Khóa phòng độc quyền:** Khi bot đang phục vụ phòng Voice A, người dùng ở phòng Voice B (kể cả Role HE hay Admin) **không thể** gọi hoặc can thiệp vào bot.\n"
+            "⏱️ **Tự động ngắt tiết kiệm tài nguyên (AFK 60s):** Khi tất cả thành viên rời phòng voice, bot sẽ tự động đếm ngược **1 phút** rồi rời phòng để tiết kiệm băng thông.\n"
+            "👑 **Quyền hạn:** Dành riêng cho thành viên có **Role HE**, Admin hoặc Founder."
+        ),
+        inline=False
+    )
+
+    if guild and guild.icon:
+        embed.set_footer(text="HEe • Beat | Bấm các nút bên dưới để điều khiển nhanh", icon_url=guild.icon.url)
+    else:
+        embed.set_footer(text="HEe • Beat | Bấm các nút bên dưới để điều khiển nhanh")
+    return embed
+
+# ─────────────────── BOT SETUP ───────────────────
+intents = discord.Intents.default()
+intents.guilds = True
+intents.messages = True
+intents.message_content = True
+intents.voice_states = True
+
+class BeatBot(commands.Bot):
+    def __init__(self):
+        super().__init__(command_prefix=['he!', 'HE!', 'he! '], intents=intents, help_command=None)
+
+    async def setup_hook(self):
+        guild = discord.Object(id=GUILD_ID)
+        self.add_view(MusicControlsView())
+        self.tree.copy_global_to(guild=guild)
+        try:
+            synced = await self.tree.sync(guild=guild)
+            logger.info(f"Synced {len(synced)} slash command(s) vào guild {GUILD_ID}.")
+        except discord.Forbidden:
+            synced = await self.tree.sync()
+            logger.info(f"Synced {len(synced)} global slash command(s).")
+
+    async def on_ready(self):
+        logger.info(f"Logged in as {self.user} (ID: {self.user.id})")
+        await self.change_presence(
+            activity=discord.Activity(type=discord.ActivityType.listening, name="he!p <link_ytb> | he!i | Role HE")
+        )
+
+bot = BeatBot()
 
 async def play_next_song(guild: discord.Guild):
     manager = get_manager(guild.id)
@@ -251,12 +397,12 @@ async def play_next_song(guild: discord.Guild):
                     f"📋 **Còn lại trong hàng đợi:** `{len(manager.queue)} bài`"
                 ),
                 color=COLOR_RED,
-                timestamp=datetime.now()
+                timestamp=datetime.now(timezone.utc)
             )
             if next_song.thumbnail:
                 embed.set_thumbnail(url=next_song.thumbnail)
             embed.set_footer(text="High Ego eSport • Exclusive Music Suite")
-            await manager.text_channel.send(embed=embed)
+            await manager.text_channel.send(embed=embed, view=MusicControlsView())
 
     except Exception as e:
         logger.error(f"Lỗi khởi tạo âm thanh: {e}")
@@ -512,6 +658,13 @@ async def prefix_leave(ctx: commands.Context):
     else:
         await ctx.send("⚠️ Bot không có trong kênh voice nào.")
 
+@bot.command(name='i', aliases=['info', 'help', 'guide'])
+async def prefix_info(ctx: commands.Context):
+    """Hiển thị bảng hướng dẫn và dàn nút điều khiển âm nhạc"""
+    embed = build_guide_embed(ctx.guild)
+    view = MusicControlsView()
+    await ctx.send(embed=embed, view=view)
+
 # ─────────────────── SLASH COMMANDS (/play ...) ───────────────────
 @bot.tree.command(name='play', description='[Role HE] Phát nhạc YouTube cụ thể (độc quyền phòng voice)')
 @app_commands.describe(link_ytb='Link YouTube video hoặc shorts cụ thể')
@@ -662,6 +815,18 @@ async def slash_leave(interaction: discord.Interaction):
         await interaction.response.send_message("👋 Đã rời khỏi phòng voice và dọn dẹp hàng đợi.")
     else:
         await interaction.response.send_message("⚠️ Bot không có trong kênh voice nào.", ephemeral=True)
+
+@bot.tree.command(name='info', description='Bảng hướng dẫn lệnh và các nút điều khiển bot nhạc HEe • Beat')
+async def slash_info(interaction: discord.Interaction):
+    embed = build_guide_embed(interaction.guild)
+    view = MusicControlsView()
+    await interaction.response.send_message(embed=embed, view=view)
+
+@bot.tree.command(name='guide', description='Hướng dẫn sử dụng và bảng nút thao tác nhanh HEe • Beat')
+async def slash_guide(interaction: discord.Interaction):
+    embed = build_guide_embed(interaction.guild)
+    view = MusicControlsView()
+    await interaction.response.send_message(embed=embed, view=view)
 
 if __name__ == '__main__':
     if not BOT_TOKEN:

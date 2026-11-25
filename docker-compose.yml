@@ -70,3 +70,5 @@ services:
     restart: unless-stopped
     env_file:
       - ./hee_music/.env
+    volumes:
+      - ./hee_music:/app
