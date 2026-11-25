@@ -425,7 +425,7 @@ async def process_play_request(
     player: Optional[wavelink.Player] = guild.voice_client
     if not player:
         try:
-            player = await target_vc.connect(cls=wavelink.Player)
+            player = await target_vc.connect(cls=wavelink.Player, self_deaf=True)
         except Exception as e:
             await channel_send(f"❌ Không thể kết nối vào kênh voice: {e}")
             return
