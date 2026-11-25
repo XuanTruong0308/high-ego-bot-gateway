@@ -10,6 +10,21 @@ Bot Welcome / Goodbye (Embed Đỏ-Đen + GIF động) và tự động tạo k�
    - Bot Permissions: `Manage Channels`, `Send Messages`, `Embed Links`, `Attach Files`, `View Channels`
 
 ## 2. Cài đặt & Chạy
+
+### Windows (PowerShell)
+```powershell
+cd hee_welcome_builder
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+
+Copy-Item .env.example .env
+# Điền DISCORD_TOKEN (và GUILD_ID nếu muốn sync lệnh ngay lập tức) vào .env
+
+python bot.py
+```
+
+### Linux / macOS (Bash)
 ```bash
 cd hee_welcome_builder
 python3 -m venv .venv

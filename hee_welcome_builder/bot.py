@@ -44,7 +44,11 @@ def _resolve_channel(guild: discord.Guild, key: str, env_fallback: int | None) -
     channel_id = cfg.get(key) or env_fallback
     if not channel_id:
         return None
-    channel = guild.get_channel(int(channel_id))
+    try:
+        parsed_id = int(channel_id)
+    except (TypeError, ValueError):
+        return None
+    channel = guild.get_channel(parsed_id)
     return channel if isinstance(channel, discord.TextChannel) else None
 
 
@@ -176,10 +180,21 @@ async def build_channel(
         await interaction.response.send_message("Lệnh này chỉ dùng được trong server.", ephemeral=True)
         return
 
+    clean_name = ten.strip()
+    if not clean_name:
+        await interaction.response.send_message("Tên kênh hoặc Category không được để trống.", ephemeral=True)
+        return
+
     func_value = chuc_nang.value if chuc_nang else "normal"
     if func_value in {"welcome", "goodbye"} and loai.value != "text":
         await interaction.response.send_message(
             "Chức năng Welcome/Goodbye chỉ áp dụng được cho **Text Channel**.",
+            ephemeral=True,
+        )
+        return
+    if func_value == "sleep_voice" and loai.value != "voice":
+        await interaction.response.send_message(
+            "Chức năng **Room Ngủ (Voice AFK)** chỉ áp dụng được cho **Voice Channel**.",
             ephemeral=True,
         )
         return
@@ -189,16 +204,16 @@ async def build_channel(
 
     try:
         if loai.value == "category":
-            created = await guild.create_category(name=ten.strip())
+            created = await guild.create_category(name=clean_name)
         elif loai.value == "voice":
             created = await guild.create_voice_channel(
-                name=ten.strip(),
+                name=clean_name,
                 category=category,
                 user_limit=gioi_han_nguoi,
             )
         else:
             created = await guild.create_text_channel(
-                name=ten.strip(),
+                name=clean_name,
                 category=category,
             )
             if func_value == "welcome":
@@ -208,6 +223,12 @@ async def build_channel(
     except discord.Forbidden:
         await interaction.followup.send(
             "Bot chưa có quyền **Manage Channels** để tạo kênh. Hãy kiểm tra lại quyền của bot.",
+            ephemeral=True,
+        )
+        return
+    except discord.HTTPException as exc:
+        await interaction.followup.send(
+            f"Không thể tạo kênh do Discord từ chối yêu cầu: `{exc.text}`",
             ephemeral=True,
         )
         return
@@ -270,12 +291,19 @@ async def test_banner(
         return
 
     await interaction.response.defer(ephemeral=True)
-    if loai.value == "welcome":
-        embed = _build_welcome_embed(interaction.user, interaction.guild)
-        await _send_banner(interaction.channel, embed, WELCOME_GIF, "welcome.gif")
-    else:
-        embed = _build_goodbye_embed(interaction.user, interaction.guild)
-        await _send_banner(interaction.channel, embed, GOODBYE_GIF, "goodbye.gif")
+    try:
+        if loai.value == "welcome":
+            embed = _build_welcome_embed(interaction.user, interaction.guild)
+            await _send_banner(interaction.channel, embed, WELCOME_GIF, "welcome.gif")
+        else:
+            embed = _build_goodbye_embed(interaction.user, interaction.guild)
+            await _send_banner(interaction.channel, embed, GOODBYE_GIF, "goodbye.gif")
+    except discord.Forbidden:
+        await interaction.followup.send(
+            "Bot thiếu quyền gửi tin nhắn, nhúng liên kết hoặc đính kèm tệp trong kênh này.",
+            ephemeral=True,
+        )
+        return
 
     await interaction.followup.send(f"Đã gửi thử banner **{loai.name}**!", ephemeral=True)
 
