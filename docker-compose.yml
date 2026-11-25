@@ -21,8 +21,8 @@ services:
 
   sentinel:
     build:
-      context: .
-      dockerfile: ./hee_mod/Dockerfile
+      context: ./hee_mod
+      dockerfile: Dockerfile
     restart: unless-stopped
     env_file:
       - ./hee_mod/.env
@@ -42,8 +42,8 @@ services:
 
   vault:
     build:
-      context: .
-      dockerfile: ./hee_economy/Dockerfile
+      context: ./hee_economy
+      dockerfile: Dockerfile
     restart: unless-stopped
     env_file:
       - ./hee_economy/.env
