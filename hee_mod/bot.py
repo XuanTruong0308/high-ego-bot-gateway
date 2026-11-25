@@ -19,6 +19,13 @@ from dotenv import load_dotenv
 from filter_engine import ProfanityFilter
 import error_logger
 
+# Import module kinh tế dùng chung để trừ điểm vi phạm
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared_data")))
+try:
+    import economy_db
+except ImportError:
+    economy_db = None
+
 load_dotenv()
 
 # ─────────────────────────── Windows UTF-8 fix ───────────────────────────
@@ -110,12 +117,32 @@ async def on_message(message: discord.Message):
         except discord.NotFound:
             return
 
-        # 2. Gửi cảnh báo tạm thời cho người vi phạm (tự biến mất sau 6 giây)
+        # 2. Xử lý phạt theo Phương Án 1 (Bậc thang trừ điểm Daily)
+        strike_num = 1
+        penalty_pts = 0.0
+        remaining_pts = 0.0
+        penalty_msg = ""
+
+        if economy_db:
+            try:
+                strike_num, penalty_pts, remaining_pts = economy_db.apply_profanity_penalty(
+                    user_id=author.id,
+                    guild_id=message.guild.id,
+                    word=word
+                )
+                if strike_num == 1:
+                    penalty_msg = "\n⚠️ **Cảnh cáo lần 1:** Hãy giữ gìn văn hóa trò chuyện (Chưa trừ điểm)."
+                else:
+                    penalty_msg = f"\n💸 **Vi phạm lần {strike_num}:** Bị phạt trừ **-{penalty_pts:.0f} Điểm** (-{int(penalty_pts * 1000):,} VNĐ)!\n💰 Số dư còn lại: `{remaining_pts:.1f} Điểm`."
+            except Exception as e:
+                logger.error(f"Lỗi khi trừ điểm vi phạm: {e}")
+
+        # Gửi cảnh báo tạm thời cho người vi phạm (tự biến mất sau 7 giây)
         try:
             warning = await channel.send(
-                f'⚠️ {author.mention}, tin nhắn của bạn đã bị gỡ bỏ do vi phạm quy tắc ngôn từ của **High Ego eSport**.'
+                f'🛑 {author.mention}, tin nhắn của bạn đã bị gỡ bỏ do vi phạm quy tắc ngôn từ của **High Ego eSport**.{penalty_msg}'
             )
-            await asyncio.sleep(6)
+            await asyncio.sleep(7)
             await warning.delete()
         except Exception:
             pass
@@ -125,15 +152,16 @@ async def on_message(message: discord.Message):
             log_chan = message.guild.get_channel(LOG_CHANNEL_ID)
             if log_chan:
                 embed = discord.Embed(
-                    title='🚨 Cảnh Báo Ngôn Từ Vi Phạm',
+                    title=f'🚨 Cảnh Báo Ngôn Từ (Lần {strike_num})',
                     color=COLOR_RED,
                     timestamp=datetime.now()
                 )
                 embed.add_field(name='Người gửi', value=f'{author.mention} (`{author.id}`)', inline=True)
                 embed.add_field(name='Kênh', value=channel.mention, inline=True)
                 embed.add_field(name='Từ phát hiện', value=f'`{word}`', inline=True)
+                embed.add_field(name='Hình phạt', value=f'Trừ `{penalty_pts:.0f} Điểm` (Còn `{remaining_pts:.1f}` Điểm)', inline=True)
                 embed.add_field(name='Nội dung gốc', value=f'```{raw_content[:900]}```', inline=False)
-                embed.set_footer(text='HEe • Sentinel AutoMod')
+                embed.set_footer(text='HEe • Sentinel AutoMod & Economy')
                 try:
                     await log_chan.send(embed=embed)
                 except Exception:

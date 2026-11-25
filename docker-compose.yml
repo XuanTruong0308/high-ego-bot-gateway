@@ -21,13 +21,14 @@ services:
 
   sentinel:
     build:
-      context: ./hee_mod
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./hee_mod/Dockerfile
     restart: unless-stopped
     env_file:
       - ./hee_mod/.env
     volumes:
       - ./hee_mod/logs:/app/logs
+      - ./shared_data:/shared_data
 
   tribunal:
     build:
@@ -38,3 +39,13 @@ services:
       - ./hee_ticket/.env
     volumes:
       - ./hee_ticket/data:/app/data
+
+  vault:
+    build:
+      context: .
+      dockerfile: ./hee_economy/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./hee_economy/.env
+    volumes:
+      - ./shared_data:/shared_data

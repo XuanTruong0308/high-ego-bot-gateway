@@ -1,0 +1,184 @@
+"""
+bot.py — HEe • Vault (P5 - Economy & Daily Bot)
+1. Lệnh /daily nhận 1 điểm / ngày (= 1k VNĐ).
+2. Lệnh /balance xem số dư điểm và số lần cảnh cáo vi phạm.
+3. Lệnh /point-add dành riêng cho Role HE / Admin để cộng/trừ điểm (bắt buộc nhập reason).
+4. Giới hạn quy đổi: Min 50 điểm (50k) - Max 100 điểm (100k).
+"""
+
+import os
+import sys
+import logging
+from datetime import datetime
+
+import discord
+from discord import app_commands
+from discord.ext import commands
+from dotenv import load_dotenv
+
+# Thêm đường dẫn shared_data
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared_data")))
+import economy_db
+
+load_dotenv()
+
+try:
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+except AttributeError:
+    pass
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
+logger = logging.getLogger('HEe.Vault')
+
+BOT_TOKEN        = os.getenv('BOT_TOKEN', '')
+GUILD_ID         = int(os.getenv('GUILD_ID', '0'))
+HE_ROLE_NAME     = os.getenv('HE_ROLE_NAME', 'HE')
+DAILY_CHANNEL_ID = int(os.getenv('DAILY_CHANNEL_ID', '0'))
+AUDIT_LOG_ID     = int(os.getenv('AUDIT_LOG_CHANNEL_ID', '0'))
+
+COLOR_RED  = 0xE11D48
+COLOR_DARK = 0x881337
+
+intents = discord.Intents.default()
+intents.members = True
+
+def has_he_role(member: discord.Member) -> bool:
+    if member.guild_permissions.administrator:
+        return True
+    return any(r.name == HE_ROLE_NAME or str(r.id) == HE_ROLE_NAME for r in member.roles)
+
+class VaultBot(commands.Bot):
+    def __init__(self):
+        super().__init__(command_prefix='!', intents=intents)
+
+    async def setup_hook(self):
+        economy_db.init_db()
+        logger.info('Database Economy dùng chung khởi tạo thành công.')
+
+        guild = discord.Object(id=GUILD_ID)
+        self.tree.copy_global_to(guild=guild)
+        try:
+            synced = await self.tree.sync(guild=guild)
+            logger.info(f'Synced {len(synced)} slash command(s) vào guild {GUILD_ID}.')
+        except discord.Forbidden:
+            synced = await self.tree.sync()
+            logger.info(f'Synced {len(synced)} global slash command(s).')
+
+    async def on_ready(self):
+        logger.info(f'Logged in as {self.user} (ID: {self.user.id})')
+
+bot = VaultBot()
+
+@bot.tree.command(name='daily', description='Điểm danh nhận 1 Điểm thưởng (= 1,000 VNĐ) mỗi ngày')
+async def cmd_daily(interaction: discord.Interaction):
+    # Kiểm tra kênh chỉ định nếu có cấu hình
+    if DAILY_CHANNEL_ID and interaction.channel_id != DAILY_CHANNEL_ID:
+        await interaction.response.send_message(
+            f'❌ Bạn chỉ có thể điểm danh tại kênh <#{DAILY_CHANNEL_ID}>!', ephemeral=True
+        )
+        return
+
+    success, msg, new_balance = economy_db.claim_daily(interaction.user.id, interaction.guild_id)
+    if not success:
+        await interaction.response.send_message(f'⏳ {interaction.user.mention}, {msg}', ephemeral=True)
+        return
+
+    embed = discord.Embed(
+        title='🎁 Điểm Danh Hằng Ngày — HEe Vault',
+        description=(
+            f'Chúc mừng {interaction.user.mention}!\n'
+            f'{msg}\n\n'
+            f'💰 **Số dư hiện tại:** `{new_balance:.1f} Điểm` ({int(new_balance * 1000):,} VNĐ)\n'
+            f'📌 *Tích đủ tối thiểu 50 Điểm (50k) và tối đa 100 Điểm (100k) để mở ticket quy đổi tiền thật.*'
+        ),
+        color=COLOR_RED,
+        timestamp=datetime.now()
+    )
+    embed.set_thumbnail(url=interaction.user.display_avatar.url)
+    embed.set_footer(text='High Ego eSport • Quỹ Thưởng Thành Viên')
+    await interaction.response.send_message(embed=embed)
+
+@bot.tree.command(name='balance', description='Xem số dư điểm thưởng và lịch sử vi phạm của bạn')
+@app_commands.describe(thanh_vien='Thành viên muốn tra cứu (mặc định: chính bạn)')
+async def cmd_balance(interaction: discord.Interaction, thanh_vien: discord.Member = None):
+    target = thanh_vien or interaction.user
+    user = economy_db.get_user(target.id, interaction.guild_id)
+    points = user['points']
+    strikes = user['strike_count']
+
+    embed = discord.Embed(
+        title=f'💳 Tài Khoản Thưởng — {target.display_name}',
+        color=COLOR_RED,
+        timestamp=datetime.now()
+    )
+    embed.set_thumbnail(url=target.display_avatar.url)
+    embed.add_field(name='💰 Số Dư Điểm', value=f'**{points:.1f} Điểm**', inline=True)
+    embed.add_field(name='💵 Quy Đổi VNĐ', value=f'**{int(points * 1000):,} VNĐ**', inline=True)
+    embed.add_field(name='⚠️ Cảnh Cáo Vi Phạm', value=f'{strikes} lần', inline=True)
+
+    status_str = "Chưa đủ điều kiện rút (Cần tối thiểu 50 Điểm)"
+    if points >= 50.0:
+        status_str = "✅ Đủ điều kiện tạo ticket quy đổi!"
+
+    embed.add_field(name='Trạng Thái Quy Đổi', value=status_str, inline=False)
+    embed.set_footer(text='HEe Vault • 1 Điểm = 1,000 VNĐ')
+    await interaction.response.send_message(embed=embed)
+
+@bot.tree.command(name='point-add', description='[Role HE / Admin] Cộng hoặc trừ điểm thành viên kèm lý do bắt buộc')
+@app_commands.describe(
+    thanh_vien='Thành viên cần điều chỉnh điểm',
+    so_diem='Số điểm cần thay đổi (dương để cộng, âm để trừ)',
+    ly_do='Lý do bắt buộc thực hiện giao dịch này'
+)
+async def cmd_point_add(interaction: discord.Interaction, thanh_vien: discord.Member, so_diem: float, ly_do: str):
+    member = interaction.user
+    if not isinstance(member, discord.Member) or not has_he_role(member):
+        await interaction.response.send_message('❌ Bạn phải có **Role HE** hoặc là **Administrator** mới được dùng lệnh này!', ephemeral=True)
+        return
+
+    if not ly_do or len(ly_do.strip()) < 3:
+        await interaction.response.send_message('❌ Bạn **bắt buộc phải nhập lý do** rõ ràng khi cộng/trừ điểm!', ephemeral=True)
+        return
+
+    new_balance = economy_db.add_points_admin(
+        user_id=thanh_vien.id,
+        guild_id=interaction.guild_id,
+        amount=so_diem,
+        reason=ly_do.strip(),
+        operator_id=member.id
+    )
+
+    sign = '+' if so_diem >= 0 else ''
+    embed = discord.Embed(
+        title='📝 Điều Chỉnh Điểm Thành Công',
+        description=(
+            f'**Người nhận:** {thanh_vien.mention}\n'
+            f'**Thay đổi:** `{sign}{so_diem:.1f} Điểm` ({int(so_diem * 1000):,} VNĐ)\n'
+            f'**Số dư mới:** `{new_balance:.1f} Điểm`\n'
+            f'**Lý do:** {ly_do}\n'
+            f'**Người thực hiện:** {member.mention} (Role HE)'
+        ),
+        color=COLOR_RED,
+        timestamp=datetime.now()
+    )
+    await interaction.response.send_message(embed=embed)
+
+    # Gửi log kiểm toán
+    if AUDIT_LOG_ID:
+        log_chan = interaction.guild.get_channel(AUDIT_LOG_ID)
+        if log_chan:
+            await log_chan.send(embed=embed)
+
+if __name__ == '__main__':
+    if not BOT_TOKEN:
+        logger.error('BOT_TOKEN chưa cài đặt!')
+        sys.exit(1)
+    if not GUILD_ID:
+        logger.error('GUILD_ID chưa cài đặt!')
+        sys.exit(1)
+    bot.run(BOT_TOKEN, log_handler=None)
