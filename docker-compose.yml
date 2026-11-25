@@ -62,3 +62,11 @@ services:
       - ./hee_giveaway/data:/app/data
       - ./shared_data:/shared_data
       - ./hee_rank/data:/rank_data:ro
+
+  beat:
+    build:
+      context: ./hee_music
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./hee_music/.env
