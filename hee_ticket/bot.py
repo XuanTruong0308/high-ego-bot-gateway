@@ -156,10 +156,12 @@ class TicketCategorySelect(discord.ui.Select):
             guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, manage_channels=True, manage_messages=True)
         }
 
-        # Thêm quyền cho role HE
+        # Thêm quyền cho role HE và lấy đối tượng role để mention
+        he_role_mention = "@here"
         for role in guild.roles:
             if role.name == HE_ROLE_NAME or str(role.id) == HE_ROLE_NAME:
                 overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True, attach_files=True, embed_links=True)
+                he_role_mention = role.mention
 
         clean_name = f"ticket-{selected_type}-{member.name.lower()[:10]}"
         try:
@@ -193,7 +195,7 @@ class TicketCategorySelect(discord.ui.Select):
         embed.set_footer(text='High Ego eSport • Ban Quản Trị')
 
         control_view = TicketControlView()
-        await ticket_chan.send(embed=embed, view=control_view)
+        await ticket_chan.send(content=f'📢 {he_role_mention} | Có yêu cầu hỗ trợ mới từ {member.mention}!', embed=embed, view=control_view)
 
         await interaction.followup.send(f'✅ Ticket của bạn đã được tạo thành công tại {ticket_chan.mention}!', ephemeral=True)
 
