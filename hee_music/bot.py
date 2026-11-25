@@ -41,7 +41,6 @@ BOT_TOKEN        = os.getenv('BOT_TOKEN', '')
 GUILD_ID         = int(os.getenv('GUILD_ID', '0'))
 HE_ROLE_NAME     = os.getenv('HE_ROLE_NAME', 'HE')
 OWNER_USER_ID    = os.getenv('OWNER_USER_ID', '1147375213634388008')
-MUSIC_CHANNEL_ID = int(os.getenv('MUSIC_CHANNEL_ID', '0'))
 
 COLOR_RED  = 0xE11D48
 COLOR_DARK = 0x881337
