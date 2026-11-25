@@ -50,3 +50,15 @@ services:
     volumes:
       - ./shared_data:/shared_data
       - ./hee_rank/data:/rank_data:ro
+
+  bounty:
+    build:
+      context: ./hee_giveaway
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./hee_giveaway/.env
+    volumes:
+      - ./hee_giveaway/data:/app/data
+      - ./shared_data:/shared_data
+      - ./hee_rank/data:/rank_data:ro
