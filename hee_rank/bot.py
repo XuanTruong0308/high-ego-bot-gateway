@@ -168,16 +168,22 @@ class Chronicle(commands.Bot):
 
     @tasks.loop(minutes=1)
     async def flush_voice_loop(self):
-        """Mỗi phút: cộng XP voice cho tất cả member đang ở voice."""
-        for guild in self.guilds:
-            if guild.id != GUILD_ID:
-                continue
-            for vc in guild.voice_channels:
-                for member in vc.members:
-                    if member.bot:
-                        continue
-                    # Thay vì flush hẳn, chỉ cộng XP 1 phút mỗi vòng lặp
-                    db.add_xp_manual(member.id, guild.id, XP_VOICE_MIN)
+        """Mỗi phút: cộng XP voice và tăng 1 phút cho tất cả member đang ở voice (không tính mute hoặc bot)."""
+        guild = self.get_guild(GUILD_ID)
+        if not guild:
+            return
+        
+        # Quét tất cả các kênh Voice trong server HEe
+        for vc in guild.voice_channels:
+            for member in vc.members:
+                if member.bot:
+                    continue
+                # Bỏ qua nếu member bị deafen (tắt tai nghe / treo máy hoàn toàn)
+                if member.voice and member.voice.self_deaf:
+                    continue
+                # Cộng đúng 1 phút voice và XP
+                db.add_voice_minute(member.id, guild.id, XP_VOICE_MIN)
+                logger.debug(f'+{XP_VOICE_MIN} XP voice (+1m) -> {member.display_name}')
 
     @flush_voice_loop.before_loop
     async def before_flush(self):

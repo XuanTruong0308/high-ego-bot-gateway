@@ -136,14 +136,16 @@ def flush_voice_xp(user_id: int, guild_id: int, xp_per_min: float) -> int:
     return minutes
 
 
-def add_xp_manual(user_id: int, guild_id: int, xp_gain: float) -> None:
-    """Admin: cộng XP thủ công."""
+def add_voice_minute(user_id: int, guild_id: int, xp_gain: float) -> None:
+    """Cộng 1 phút voice và XP tương ứng vào database."""
     now = time.time()
     upsert_member(user_id, guild_id)
     with _connect() as conn:
         conn.execute("""
             UPDATE members
-            SET xp = MAX(0, xp + ?), updated_at=?
+            SET xp = xp + ?,
+                total_voice_min = total_voice_min + 1,
+                updated_at = ?
             WHERE user_id=? AND guild_id=?
         """, (xp_gain, now, str(user_id), str(guild_id)))
 
