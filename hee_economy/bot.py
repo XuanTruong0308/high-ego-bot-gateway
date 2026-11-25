@@ -50,7 +50,6 @@ COLOR_RED  = 0xE11D48
 COLOR_DARK = 0x881337
 
 intents = discord.Intents.default()
-intents.members = True
 
 def has_he_role(member: discord.Member) -> bool:
     if member.guild_permissions.administrator:
