@@ -67,7 +67,7 @@ services:
     image: ghcr.io/lavalink-devs/lavalink:4
     restart: unless-stopped
     environment:
-      - _JAVA_OPTIONS=-Xmx512M
+      - _JAVA_OPTIONS=-Xmx512M -Duser.language=en -Duser.country=US
     volumes:
       - ./lavalink/application.yml:/opt/Lavalink/application.yml
       - ./lavalink/plugins:/opt/Lavalink/plugins
