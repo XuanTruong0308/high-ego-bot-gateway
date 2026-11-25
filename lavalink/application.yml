@@ -6,9 +6,9 @@ server:
 
 lavalink:
   plugins:
-    - dependency: "dev.lavalink.youtube:youtube-plugin:1.18.2"
-      repository: "https://maven.lavalink.dev/releases"
-      snapshot: false
+    - dependency: "dev.lavalink.youtube:youtube-plugin:e41dd95f8bd134b51e75080fb28cc805fecb431a"
+      repository: "https://maven.lavalink.dev/snapshots"
+      snapshot: true
   server:
     password: "hee_secret_password_2026"
     sources:
@@ -50,11 +50,11 @@ plugins:
     allowDirectPlaylistIds: true
     clients:
       - MUSIC
+      - ANDROID
+      - IOS
       - WEB
-      - ANDROID_VR
-      - TV
-      - TVHTML5_SIMPLY
       - MWEB
+      - TVHTML5_SIMPLY
     oauth:
       enabled: true
       refreshToken: "1//0gU00hzVAY0VXCgYIARAAGBASSQF-L9Irtl39DpmISCJvem0h-Ayvl6QoNNrthbg7Dzwow4glFDOxexPsUvWM8KVPS6LWGQBmvR2m4GaGkk5RQP4WK9ukJag0Cpg"

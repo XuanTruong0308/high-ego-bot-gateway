@@ -79,8 +79,8 @@ async def delete_after_delay(msg, delay: int = 10):
         await asyncio.sleep(delay)
         if hasattr(msg, 'delete'):
             await msg.delete()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"Không thể xóa message: {e}")
 
 # ─────────────────── VOICE HELPERS ───────────────────
 def check_voice_exclusivity(member: discord.Member, guild: discord.Guild) -> tuple[bool, str, Optional[discord.VoiceChannel]]:
@@ -319,6 +319,15 @@ async def on_wavelink_track_start(payload: wavelink.TrackStartEventPayload):
     if not player or not track:
         return
 
+    # Dọn dẹp tin nhắn Đang Phát trước đó nếu có
+    old_np = getattr(player, 'now_playing_msg', None)
+    if old_np:
+        try:
+            await old_np.delete()
+        except Exception:
+            pass
+        player.now_playing_msg = None
+
     home_channel = getattr(player, 'home_channel', None)
     if home_channel and hasattr(home_channel, 'send'):
         req_mention = getattr(track, 'requester_mention', 'Role HE')
@@ -337,14 +346,26 @@ async def on_wavelink_track_start(payload: wavelink.TrackStartEventPayload):
         if track.artwork:
             embed.set_thumbnail(url=track.artwork)
         embed.set_footer(text="High Ego eSport • Lavalink v4 Audio Engine")
-        await home_channel.send(embed=embed, view=MusicControlsView())
+        player.now_playing_msg = await home_channel.send(embed=embed, view=MusicControlsView())
 
 @bot.event
 async def on_wavelink_track_end(payload: wavelink.TrackEndEventPayload):
     player: wavelink.Player = payload.player
     if not player:
         return
+
+    logger.info(f"Track kết thúc: {payload.track.title if payload.track else 'Không rõ'} | Lý do: {payload.reason}")
+
+    # Nếu hàng đợi trống và không còn bài nào đang phát
     if player.queue.is_empty and not player.playing:
+        old_np = getattr(player, 'now_playing_msg', None)
+        if old_np:
+            try:
+                await old_np.delete()
+            except Exception:
+                pass
+            player.now_playing_msg = None
+
         home_channel = getattr(player, 'home_channel', None)
         if home_channel and hasattr(home_channel, 'send'):
             embed = discord.Embed(
@@ -352,7 +373,12 @@ async def on_wavelink_track_end(payload: wavelink.TrackEndEventPayload):
                 description="Đã phát hết danh sách nhạc trong hàng đợi. Đang chờ thêm bài hát mới...",
                 color=COLOR_RED
             )
-            await home_channel.send(embed=embed)
+            try:
+                end_msg = await home_channel.send(embed=embed)
+                if end_msg:
+                    asyncio.create_task(delete_after_delay(end_msg, 10))
+            except Exception as e:
+                logger.error(f"Lỗi gửi thông báo hết hàng đợi: {e}")
 
 # ─────────────────── AUTO-LEAVE AFK ───────────────────
 @bot.event
@@ -441,9 +467,13 @@ async def process_play_request(
         task.cancel()
         afk_tasks[guild.id] = None
 
-    loading_msg = await channel_send("🔍 Đang tải dữ liệu từ YouTube qua Lavalink...")
-    if loading_msg:
-        asyncio.create_task(delete_after_delay(loading_msg, 5))
+    loading_msg = None
+    try:
+        loading_msg = await text_channel.send("🔍 Đang tải dữ liệu từ YouTube qua Lavalink...")
+        if loading_msg:
+            asyncio.create_task(delete_after_delay(loading_msg, 4))
+    except Exception as e:
+        logger.debug(f"Không thể gửi loading_msg: {e}")
 
     try:
         tracks: wavelink.Search = await wavelink.Playable.search(clean_url)
@@ -473,23 +503,32 @@ async def process_play_request(
                 f"⏱️ **Thời lượng:** `{format_duration(track.length)}`\n"
                 f"🔢 **Vị trí trong hàng đợi:** `#{len(player.queue)}`\n"
                 f"👤 **Yêu cầu:** {member.mention}\n\n"
-                f"*(Thông báo này sẽ tự động xóa sau 10 giây để tránh làm loãng chat)*"
+                f"*(Thông báo này sẽ tự động xóa sau 10 giây)*"
             ),
             color=COLOR_RED
         )
         if track.artwork:
             embed.set_thumbnail(url=track.artwork)
-        sent_msg = await channel_send(embed=embed)
-        if sent_msg:
-            asyncio.create_task(delete_after_delay(sent_msg, 10))
+        try:
+            sent_msg = await text_channel.send(embed=embed)
+            if sent_msg:
+                asyncio.create_task(delete_after_delay(sent_msg, 10))
+        except Exception as e:
+            logger.error(f"Lỗi gửi thông báo thêm hàng đợi: {e}")
     else:
         await player.play(track)
 
 # ─────────────────── PREFIX COMMANDS (he!p ...) ───────────────────
 @bot.command(name='p')
 async def prefix_play(ctx: commands.Context, *, url: str = None):
+    try:
+        await ctx.message.delete()
+    except Exception:
+        pass
     if not url:
-        await ctx.send("❌ Vui lòng nhập link YouTube cần phát! Ví dụ: `he!p https://www.youtube.com/watch?v=...`")
+        sent = await ctx.send("❌ Vui lòng nhập link YouTube cần phát! Ví dụ: `he!p https://www.youtube.com/watch?v=...`")
+        if sent:
+            asyncio.create_task(delete_after_delay(sent, 8))
         return
     await process_play_request(ctx.send, ctx.author, ctx.guild, url, ctx.channel)
 
@@ -643,32 +682,38 @@ async def prefix_info(ctx: commands.Context):
 @bot.tree.command(name='play', description='[Role HE] Phát nhạc YouTube cụ thể (độc quyền phòng voice)')
 @app_commands.describe(link_ytb='Link YouTube video hoặc shorts cụ thể')
 async def slash_play(interaction: discord.Interaction, link_ytb: str):
-    await interaction.response.defer()
+    await interaction.response.defer(ephemeral=True)
     async def reply_func(*args, **kwargs):
-        if 'embed' in kwargs:
-            return await interaction.followup.send(embed=kwargs['embed'])
-        elif args and isinstance(args[0], discord.Embed):
-            return await interaction.followup.send(embed=args[0])
-        elif args:
-            return await interaction.followup.send(str(args[0]))
-        elif 'content' in kwargs:
-            return await interaction.followup.send(kwargs['content'])
+        try:
+            if 'embed' in kwargs:
+                return await interaction.followup.send(embed=kwargs['embed'], ephemeral=True)
+            elif args and isinstance(args[0], discord.Embed):
+                return await interaction.followup.send(embed=args[0], ephemeral=True)
+            elif args:
+                return await interaction.followup.send(str(args[0]), ephemeral=True)
+            elif 'content' in kwargs:
+                return await interaction.followup.send(kwargs['content'], ephemeral=True)
+        except Exception:
+            pass
         return None
     await process_play_request(reply_func, interaction.user, interaction.guild, link_ytb, interaction.channel)
 
 @bot.tree.command(name='he-play', description='[Role HE] Phát nhạc YouTube (tương tự /play hoặc he!p)')
 @app_commands.describe(link_ytb='Link YouTube video cụ thể')
 async def slash_he_play(interaction: discord.Interaction, link_ytb: str):
-    await interaction.response.defer()
+    await interaction.response.defer(ephemeral=True)
     async def reply_func(*args, **kwargs):
-        if 'embed' in kwargs:
-            return await interaction.followup.send(embed=kwargs['embed'])
-        elif args and isinstance(args[0], discord.Embed):
-            return await interaction.followup.send(embed=args[0])
-        elif args:
-            return await interaction.followup.send(str(args[0]))
-        elif 'content' in kwargs:
-            return await interaction.followup.send(kwargs['content'])
+        try:
+            if 'embed' in kwargs:
+                return await interaction.followup.send(embed=kwargs['embed'], ephemeral=True)
+            elif args and isinstance(args[0], discord.Embed):
+                return await interaction.followup.send(embed=args[0], ephemeral=True)
+            elif args:
+                return await interaction.followup.send(str(args[0]), ephemeral=True)
+            elif 'content' in kwargs:
+                return await interaction.followup.send(kwargs['content'], ephemeral=True)
+        except Exception:
+            pass
         return None
     await process_play_request(reply_func, interaction.user, interaction.guild, link_ytb, interaction.channel)
 
