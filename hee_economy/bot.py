@@ -14,7 +14,12 @@ from datetime import datetime
 import discord
 from discord import app_commands
 from discord.ext import commands
+from pathlib import Path
 from dotenv import load_dotenv
+
+BASE_DIR = Path(__file__).parent
+ASSETS_DIR = BASE_DIR / "assets"
+EVENT_BANNER_GIF = ASSETS_DIR / "event_banner.gif"
 
 # Thêm đường dẫn shared_data
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared_data")))
@@ -174,6 +179,44 @@ async def cmd_point_add(interaction: discord.Interaction, thanh_vien: discord.Me
         if log_chan:
             await log_chan.send(embed=embed)
 
+@bot.tree.command(name='event-announce', description='[Role HE / Admin] Bắn thông báo sự kiện @everyone kèm Banner GIF')
+@app_commands.describe(
+    tieu_de='Tiêu đề chính của sự kiện',
+    noi_dung='Nội dung chi tiết của sự kiện (thời gian, thể lệ, phần thưởng)',
+    kenh_thong_bao='Kênh muốn gửi thông báo (mặc định: kênh hiện tại)'
+)
+async def cmd_event_announce(
+    interaction: discord.Interaction,
+    tieu_de: str,
+    noi_dung: str,
+    kenh_thong_bao: discord.TextChannel = None
+):
+    member = interaction.user
+    if not isinstance(member, discord.Member) or not has_he_role(member):
+        await interaction.response.send_message('❌ Chỉ có **Role HE** hoặc là **Administrator** mới được đăng thông báo sự kiện!', ephemeral=True)
+        return
+
+    target_channel = kenh_thong_bao or interaction.channel
+
+    embed = discord.Embed(
+        title=f'🌟 {tieu_de.upper()}',
+        description=noi_dung.replace('\\n', '\n'),
+        color=COLOR_RED,
+        timestamp=datetime.now()
+    )
+    embed.set_author(name=f'Sự Kiện — {interaction.guild.name}', icon_url=interaction.guild.icon.url if interaction.guild.icon else None)
+    embed.set_footer(text=f'Thông báo bởi {member.display_name} • High Ego eSport', icon_url=member.display_avatar.url)
+
+    # Đính kèm Banner GIF
+    if EVENT_BANNER_GIF.exists():
+        file = discord.File(str(EVENT_BANNER_GIF), filename="event_banner.gif")
+        embed.set_image(url="attachment://event_banner.gif")
+        await target_channel.send(content='@everyone', embed=embed, file=file)
+    else:
+        await target_channel.send(content='@everyone', embed=embed)
+
+    await interaction.response.send_message(f'✅ Đã phát thông báo sự kiện thành công tại {target_channel.mention}!', ephemeral=True)
+
 @bot.tree.command(name='point-reset', description='[Role HE / Admin] Đưa điểm hoặc số lần vi phạm của thành viên về 0')
 @app_commands.describe(
     thanh_vien='Thành viên cần reset',
@@ -232,6 +275,44 @@ async def cmd_point_reset(interaction: discord.Interaction, thanh_vien: discord.
         log_chan = interaction.guild.get_channel(AUDIT_LOG_ID)
         if log_chan:
             await log_chan.send(embed=embed)
+
+@bot.tree.command(name='event-announce', description='[Role HE / Admin] Bắn thông báo sự kiện @everyone kèm Banner GIF')
+@app_commands.describe(
+    tieu_de='Tiêu đề chính của sự kiện',
+    noi_dung='Nội dung chi tiết của sự kiện (thời gian, thể lệ, phần thưởng)',
+    kenh_thong_bao='Kênh muốn gửi thông báo (mặc định: kênh hiện tại)'
+)
+async def cmd_event_announce(
+    interaction: discord.Interaction,
+    tieu_de: str,
+    noi_dung: str,
+    kenh_thong_bao: discord.TextChannel = None
+):
+    member = interaction.user
+    if not isinstance(member, discord.Member) or not has_he_role(member):
+        await interaction.response.send_message('❌ Chỉ có **Role HE** hoặc là **Administrator** mới được đăng thông báo sự kiện!', ephemeral=True)
+        return
+
+    target_channel = kenh_thong_bao or interaction.channel
+
+    embed = discord.Embed(
+        title=f'🌟 {tieu_de.upper()}',
+        description=noi_dung.replace('\\n', '\n'),
+        color=COLOR_RED,
+        timestamp=datetime.now()
+    )
+    embed.set_author(name=f'Sự Kiện — {interaction.guild.name}', icon_url=interaction.guild.icon.url if interaction.guild.icon else None)
+    embed.set_footer(text=f'Thông báo bởi {member.display_name} • High Ego eSport', icon_url=member.display_avatar.url)
+
+    # Đính kèm Banner GIF
+    if EVENT_BANNER_GIF.exists():
+        file = discord.File(str(EVENT_BANNER_GIF), filename="event_banner.gif")
+        embed.set_image(url="attachment://event_banner.gif")
+        await target_channel.send(content='@everyone', embed=embed, file=file)
+    else:
+        await target_channel.send(content='@everyone', embed=embed)
+
+    await interaction.response.send_message(f'✅ Đã phát thông báo sự kiện thành công tại {target_channel.mention}!', ephemeral=True)
 
 if __name__ == '__main__':
     if not BOT_TOKEN:
