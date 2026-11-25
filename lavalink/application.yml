@@ -57,7 +57,8 @@ plugins:
       - MWEB
     oauth:
       enabled: true
-      skipInitialization: false
+      refreshToken: "1//0gU00hzVAY0VXCgYIARAAGBASSQF-L9Irtl39DpmISCJvem0h-Ayvl6QoNNrthbg7Dzwow4glFDOxexPsUvWM8KVPS6LWGQBmvR2m4GaGkk5RQP4WK9ukJag0Cpg"
+      skipInitialization: true
 
 logging:
   level:
