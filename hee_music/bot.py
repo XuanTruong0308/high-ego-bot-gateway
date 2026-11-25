@@ -359,7 +359,7 @@ async def play_next_song(guild: discord.Guild):
         manager.current = next_song
     else:
         manager.current = None
-        if manager.text_channel:
+        if manager.text_channel and hasattr(manager.text_channel, 'send'):
             embed = discord.Embed(
                 title="🎵 Hết Hàng Đợi",
                 description="Đã phát hết danh sách nhạc trong hàng đợi. Đang chờ thêm bài hát mới...",
@@ -386,7 +386,7 @@ async def play_next_song(guild: discord.Guild):
 
         vc.play(audio_source, after=after_callback)
 
-        if manager.text_channel:
+        if manager.text_channel and hasattr(manager.text_channel, 'send'):
             embed = discord.Embed(
                 title="🎶 Đang Phát — HEe Beat",
                 description=(
@@ -406,7 +406,7 @@ async def play_next_song(guild: discord.Guild):
 
     except Exception as e:
         logger.error(f"Lỗi khởi tạo âm thanh: {e}")
-        if manager.text_channel:
+        if manager.text_channel and hasattr(manager.text_channel, 'send'):
             await manager.text_channel.send(f"⚠️ Không thể phát bài hát: `{next_song.title}` ({e})")
         await play_next_song(guild)
 
@@ -433,7 +433,7 @@ async def on_voice_state_update(member: discord.Member, before: discord.VoiceSta
                     if vc and vc.is_connected() and vc.channel:
                         current_non_bots = [m for m in vc.channel.members if not m.bot]
                         if len(current_non_bots) == 0:
-                            if manager.text_channel:
+                            if manager.text_channel and hasattr(manager.text_channel, 'send'):
                                 embed = discord.Embed(
                                     title="🔌 Tự Động Rời Phòng",
                                     description=f"Phòng **{vc.channel.name}** không còn ai sau 1 phút. Bot đã tự động ngắt kết nối để tiết kiệm băng thông.",
@@ -460,7 +460,8 @@ async def process_play_request(
     channel_send,
     member: discord.Member,
     guild: discord.Guild,
-    url: str
+    url: str,
+    text_channel: Optional[discord.abc.Messageable] = None
 ):
     if not is_authorized(member):
         await channel_send("❌ Lệnh phát nhạc này chỉ dành riêng cho thành viên có **Role HE** hoặc **Administrator**!")
@@ -477,7 +478,10 @@ async def process_play_request(
         return
 
     manager = get_manager(guild.id)
-    manager.text_channel = channel_send
+    if text_channel:
+        manager.text_channel = text_channel
+    elif isinstance(channel_send, discord.abc.Messageable):
+        manager.text_channel = channel_send
 
     vc = guild.voice_client
     if not vc or not vc.is_connected():
@@ -528,7 +532,7 @@ async def prefix_play(ctx: commands.Context, *, url: str = None):
     if not url:
         await ctx.send("❌ Vui lòng nhập link YouTube cần phát! Ví dụ: `he!p https://www.youtube.com/watch?v=...`")
         return
-    await process_play_request(ctx.send, ctx.author, ctx.guild, url)
+    await process_play_request(ctx.send, ctx.author, ctx.guild, url, ctx.channel)
 
 @bot.command(name='skip')
 async def prefix_skip(ctx: commands.Context):
@@ -670,23 +674,31 @@ async def prefix_info(ctx: commands.Context):
 @app_commands.describe(link_ytb='Link YouTube video hoặc shorts cụ thể')
 async def slash_play(interaction: discord.Interaction, link_ytb: str):
     await interaction.response.defer()
-    async def reply_func(msg_or_embed):
-        if isinstance(msg_or_embed, discord.Embed):
-            await interaction.followup.send(embed=msg_or_embed)
-        else:
-            await interaction.followup.send(str(msg_or_embed))
-    await process_play_request(reply_func, interaction.user, interaction.guild, link_ytb)
+    async def reply_func(*args, **kwargs):
+        if 'embed' in kwargs:
+            await interaction.followup.send(embed=kwargs['embed'])
+        elif args and isinstance(args[0], discord.Embed):
+            await interaction.followup.send(embed=args[0])
+        elif args:
+            await interaction.followup.send(str(args[0]))
+        elif 'content' in kwargs:
+            await interaction.followup.send(kwargs['content'])
+    await process_play_request(reply_func, interaction.user, interaction.guild, link_ytb, interaction.channel)
 
 @bot.tree.command(name='he-play', description='[Role HE] Phát nhạc YouTube (tương tự /play hoặc he!p)')
 @app_commands.describe(link_ytb='Link YouTube video cụ thể')
 async def slash_he_play(interaction: discord.Interaction, link_ytb: str):
     await interaction.response.defer()
-    async def reply_func(msg_or_embed):
-        if isinstance(msg_or_embed, discord.Embed):
-            await interaction.followup.send(embed=msg_or_embed)
-        else:
-            await interaction.followup.send(str(msg_or_embed))
-    await process_play_request(reply_func, interaction.user, interaction.guild, link_ytb)
+    async def reply_func(*args, **kwargs):
+        if 'embed' in kwargs:
+            await interaction.followup.send(embed=kwargs['embed'])
+        elif args and isinstance(args[0], discord.Embed):
+            await interaction.followup.send(embed=args[0])
+        elif args:
+            await interaction.followup.send(str(args[0]))
+        elif 'content' in kwargs:
+            await interaction.followup.send(kwargs['content'])
+    await process_play_request(reply_func, interaction.user, interaction.guild, link_ytb, interaction.channel)
 
 @bot.tree.command(name='skip', description='[Role HE] Bỏ qua bài hát hiện tại')
 async def slash_skip(interaction: discord.Interaction):
