@@ -147,3 +147,26 @@ def apply_profanity_penalty(user_id: int, guild_id: int, word: str) -> tuple[int
             """, (str(user_id), str(guild_id), -penalty, new_points, f"Phạt vi phạm ngôn từ (Lần {strike}): '{word}'", now))
 
     return strike, penalty, new_points
+
+
+def reset_user_account(user_id: int, guild_id: int, reset_points: bool = True, reset_strikes: bool = True, reason: str = "Admin reset", operator_id: int | None = None) -> None:
+    """
+    Reset điểm thưởng hoặc số lần vi phạm của thành viên về 0.
+    """
+    user = get_user(user_id, guild_id)
+    now = time.time()
+    
+    new_points = 0.0 if reset_points else user['points']
+    new_strikes = 0 if reset_strikes else user['strike_count']
+
+    with _connect() as conn:
+        conn.execute("""
+            UPDATE user_balance
+            SET points=?, strike_count=?, updated_at=?
+            WHERE user_id=? AND guild_id=?
+        """, (new_points, new_strikes, now, str(user_id), str(guild_id)))
+
+        conn.execute("""
+            INSERT INTO transaction_logs (user_id, guild_id, amount, balance_after, action_type, reason, operator_id, created_at)
+            VALUES (?, ?, ?, ?, 'reset', ?, ?, ?)
+        """, (str(user_id), str(guild_id), (new_points - user['points']), new_points, reason, str(operator_id) if operator_id else None, now))

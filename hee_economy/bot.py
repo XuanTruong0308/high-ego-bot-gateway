@@ -174,6 +174,65 @@ async def cmd_point_add(interaction: discord.Interaction, thanh_vien: discord.Me
         if log_chan:
             await log_chan.send(embed=embed)
 
+@bot.tree.command(name='point-reset', description='[Role HE / Admin] Đưa điểm hoặc số lần vi phạm của thành viên về 0')
+@app_commands.describe(
+    thanh_vien='Thành viên cần reset',
+    loai_reset='Chọn mục muốn reset về 0',
+    ly_do='Lý do thực hiện reset'
+)
+@app_commands.choices(
+    loai_reset=[
+        app_commands.Choice(name='Reset cả Điểm và Vi Phạm về 0', value='both'),
+        app_commands.Choice(name='Chỉ Reset Điểm về 0', value='points'),
+        app_commands.Choice(name='Chỉ Xóa Lịch Sử Vi Phạm (0 Strike)', value='strikes'),
+    ]
+)
+async def cmd_point_reset(interaction: discord.Interaction, thanh_vien: discord.Member, loai_reset: str, ly_do: str):
+    member = interaction.user
+    if not isinstance(member, discord.Member) or not has_he_role(member):
+        await interaction.response.send_message('❌ Bạn phải có **Role HE** hoặc là **Administrator** mới được dùng lệnh này!', ephemeral=True)
+        return
+
+    if not ly_do or len(ly_do.strip()) < 3:
+        await interaction.response.send_message('❌ Bạn **bắt buộc phải nhập lý do** khi reset dữ liệu thành viên!', ephemeral=True)
+        return
+
+    reset_pts = loai_reset in ('both', 'points')
+    reset_strk = loai_reset in ('both', 'strikes')
+
+    economy_db.reset_user_account(
+        user_id=thanh_vien.id,
+        guild_id=interaction.guild_id,
+        reset_points=reset_pts,
+        reset_strikes=reset_strk,
+        reason=ly_do.strip(),
+        operator_id=member.id
+    )
+
+    desc_map = {
+        'both': 'Đã đưa **Điểm thưởng về 0** và **Xóa sạch lịch sử vi phạm**!',
+        'points': 'Đã đưa **Điểm thưởng về 0** (Giữ nguyên vi phạm)!',
+        'strikes': 'Đã **Xóa sạch lịch sử vi phạm về 0** (Ân xá cảnh cáo)!'
+    }
+
+    embed = discord.Embed(
+        title='🔄 Reset Dữ Liệu Thành Viên Thành Công',
+        description=(
+            f'**Thành viên:** {thanh_vien.mention}\n'
+            f'**Thao tác:** {desc_map.get(loai_reset)}\n'
+            f'**Lý do:** {ly_do}\n'
+            f'**Thực hiện bởi:** {member.mention} (Role HE)'
+        ),
+        color=COLOR_RED,
+        timestamp=datetime.now()
+    )
+    await interaction.response.send_message(embed=embed)
+
+    if AUDIT_LOG_ID:
+        log_chan = interaction.guild.get_channel(AUDIT_LOG_ID)
+        if log_chan:
+            await log_chan.send(embed=embed)
+
 if __name__ == '__main__':
     if not BOT_TOKEN:
         logger.error('BOT_TOKEN chưa cài đặt!')
