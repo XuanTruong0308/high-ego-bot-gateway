@@ -112,14 +112,28 @@ class GatekeeperBot(commands.Bot):
         if DEFAULT_GUILD_ID:
             guild_obj = discord.Object(id=DEFAULT_GUILD_ID)
             self.tree.copy_global_to(guild=guild_obj)
-            synced = await self.tree.sync(guild=guild_obj)
-            logger.info("Synced %d slash command(s) to guild %s.", len(synced), DEFAULT_GUILD_ID)
-        else:
-            synced = await self.tree.sync()
-            logger.info("Synced %d global slash command(s).", len(synced))
+            try:
+                synced = await self.tree.sync(guild=guild_obj)
+                logger.info("Synced %d slash command(s) to guild %s.", len(synced), DEFAULT_GUILD_ID)
+                return
+            except discord.Forbidden:
+                logger.error(
+                    "Không thể sync slash command vào GUILD_ID=%s (403 Missing Access). "
+                    "Kiểm tra lại: (1) Bot đã được invite vào đúng server chưa, "
+                    "(2) Link invite có tick scope 'applications.commands' chưa, "
+                    "(3) GUILD_ID trong .env có đúng là Server ID không. "
+                    "Đang chuyển sang sync global...",
+                    DEFAULT_GUILD_ID,
+                )
+        synced = await self.tree.sync()
+        logger.info("Synced %d global slash command(s).", len(synced))
 
     async def on_ready(self) -> None:
         logger.info("Logged in as %s (ID: %s)", self.user, self.user.id if self.user else "?")
+        guild_list = ", ".join(f"{g.name} ({g.id})" for g in self.guilds) or "chưa ở trong server nào"
+        logger.info("Connected to %d guild(s): %s", len(self.guilds), guild_list)
+        if DEFAULT_GUILD_ID and not any(g.id == DEFAULT_GUILD_ID for g in self.guilds):
+            logger.warning("Bot hiện KHÔNG có mặt trong GUILD_ID=%s đã cấu hình trong .env!", DEFAULT_GUILD_ID)
         await self.change_presence(
             activity=discord.Activity(type=discord.ActivityType.watching, name="High Ego eSport • HEe")
         )
@@ -324,7 +338,7 @@ def main() -> None:
     token = os.getenv("DISCORD_TOKEN", "").strip()
     if not token or token == "YOUR_DISCORD_BOT_TOKEN_HERE":
         raise RuntimeError("Vui lòng cấu hình DISCORD_TOKEN hợp lệ trong file .env")
-    bot.run(token)
+    bot.run(token, log_handler=None)
 
 
 if __name__ == "__main__":
