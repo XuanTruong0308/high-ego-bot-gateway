@@ -28,3 +28,13 @@ services:
       - ./hee_mod/.env
     volumes:
       - ./hee_mod/logs:/app/logs
+
+  tribunal:
+    build:
+      context: ./hee_ticket
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./hee_ticket/.env
+    volumes:
+      - ./hee_ticket/data:/app/data
