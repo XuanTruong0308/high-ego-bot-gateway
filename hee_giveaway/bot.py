@@ -329,7 +329,7 @@ async def cmd_giveaway_start(
     tuoi_acc_ngay: int = 90,
     gio_vao_server: int = 0,
     role_yeu_cau: Optional[discord.Role] = None,
-    thuong_diem_vault: float = 0
+    thuong_diem_vault: float = 0.0
 ):
     allowed, ch_msg = check_channel_allowed(interaction)
     if not allowed:
