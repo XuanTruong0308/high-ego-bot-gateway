@@ -53,6 +53,7 @@ BOT_TOKEN        = os.getenv('BOT_TOKEN', '')
 GUILD_ID         = int(os.getenv('GUILD_ID', '0'))
 HE_ROLE_NAME     = os.getenv('HE_ROLE_NAME', 'HE')
 OWNER_USER_ID    = os.getenv('OWNER_USER_ID', '1147375213634388008')
+GIVEAWAY_CHANNEL_ID = int(os.getenv('GIVEAWAY_CHANNEL_ID', '0'))
 AUDIT_LOG_ID     = int(os.getenv('AUDIT_LOG_CHANNEL_ID', '0'))
 
 COLOR_RED   = 0xE11D48
@@ -60,6 +61,12 @@ COLOR_DARK  = 0x881337
 COLOR_ENDED = 0x4B5563
 
 intents = discord.Intents.default()
+
+def check_channel_allowed(interaction: discord.Interaction) -> tuple[bool, str]:
+    """Chỉ định bot giveaway chỉ được nhắn / gọi tại đúng 1 kênh duy nhất."""
+    if GIVEAWAY_CHANNEL_ID and interaction.channel_id != GIVEAWAY_CHANNEL_ID:
+        return False, f"❌ Bot Giveaway chỉ được phép hoạt động tại kênh <#{GIVEAWAY_CHANNEL_ID}>!"
+    return True, ""
 
 def is_authorized(member: discord.Member) -> bool:
     """Quyền Admin / Role HE / Founder"""
@@ -96,10 +103,10 @@ def get_user_rank_level(user_id: int, guild_id: int) -> int:
             )
             row = cursor.fetchone()
             if row:
-                xp = row[0]
-                # Công thức tính level cơ bản: 100 * level^1.5
-                lvl = int((xp / 100) ** (1 / 1.5))
-                return max(0, lvl)
+                xp = float(row[0])
+                # Quy đổi 100 XP = 1 Level (Đồng bộ với Vault)
+                lvl = max(0, int(xp // 100))
+                return lvl
     except Exception as e:
         logger.warning(f"Lỗi đọc level rank: {e}")
     return 0
@@ -311,8 +318,7 @@ bot = BountyBot()
     tuoi_acc_ngay='Tuổi tài khoản Discord tối thiểu (mặc định: 90 ngày / 3 tháng)',
     gio_vao_server='Thời gian tối thiểu ở trong server (mặc định: 0 - không bắt buộc)',
     role_yeu_cau='Role bắt buộc phải có để tham gia',
-    thuong_diem_vault='Số Điểm Vault tự động cộng thẳng vào ví người thắng (0 nếu là quà ngoài)',
-    kenh='Kênh đăng bài giveaway (mặc định: kênh hiện tại)'
+    thuong_diem_vault='Số Điểm Vault tự động cộng thẳng vào ví người thắng (0 nếu là quà ngoài)'
 )
 async def cmd_giveaway_start(
     interaction: discord.Interaction,
@@ -323,9 +329,13 @@ async def cmd_giveaway_start(
     tuoi_acc_ngay: int = 90,
     gio_vao_server: int = 0,
     role_yeu_cau: Optional[discord.Role] = None,
-    thuong_diem_vault: float = 0,
-    kenh: Optional[discord.TextChannel] = None
+    thuong_diem_vault: float = 0
 ):
+    allowed, ch_msg = check_channel_allowed(interaction)
+    if not allowed:
+        await interaction.response.send_message(ch_msg, ephemeral=True)
+        return
+
     member = interaction.user
     if not isinstance(member, discord.Member) or not is_authorized(member):
         await interaction.response.send_message('❌ Chỉ có **Role HE** hoặc là **Administrator** mới được tạo Giveaway!', ephemeral=True)
@@ -336,7 +346,10 @@ async def cmd_giveaway_start(
         await interaction.response.send_message('❌ Định dạng thời gian không hợp lệ! Hãy nhập dạng `10m`, `2h`, `24h` hoặc `3d` (Tối thiểu 30 giây).', ephemeral=True)
         return
 
-    target_channel = kenh or interaction.channel
+    if GIVEAWAY_CHANNEL_ID:
+        target_channel = interaction.guild.get_channel(GIVEAWAY_CHANNEL_ID) or interaction.channel
+    else:
+        target_channel = interaction.channel
     end_dt = datetime.now(timezone.utc) + timedelta(seconds=seconds)
     end_timestamp = int(end_dt.timestamp())
 
@@ -398,6 +411,11 @@ async def cmd_giveaway_start(
 @bot.tree.command(name='giveaway-reroll', description='[Role HE / Admin] Bốc thăm lại người chiến thắng mới cho Giveaway')
 @app_commands.describe(tin_nhan_id='ID tin nhắn của Giveaway đã kết thúc')
 async def cmd_giveaway_reroll(interaction: discord.Interaction, tin_nhan_id: str):
+    allowed, ch_msg = check_channel_allowed(interaction)
+    if not allowed:
+        await interaction.response.send_message(ch_msg, ephemeral=True)
+        return
+
     member = interaction.user
     if not isinstance(member, discord.Member) or not is_authorized(member):
         await interaction.response.send_message('❌ Bạn phải có **Role HE** hoặc là **Administrator** mới được reroll!', ephemeral=True)
@@ -431,6 +449,11 @@ async def cmd_giveaway_reroll(interaction: discord.Interaction, tin_nhan_id: str
 @bot.tree.command(name='giveaway-end', description='[Role HE / Admin] Kết thúc và quay số Giveaway ngay lập tức')
 @app_commands.describe(tin_nhan_id='ID tin nhắn của Giveaway cần dừng sớm')
 async def cmd_giveaway_end(interaction: discord.Interaction, tin_nhan_id: str):
+    allowed, ch_msg = check_channel_allowed(interaction)
+    if not allowed:
+        await interaction.response.send_message(ch_msg, ephemeral=True)
+        return
+
     member = interaction.user
     if not isinstance(member, discord.Member) or not is_authorized(member):
         await interaction.response.send_message('❌ Bạn phải có **Role HE** hoặc là **Administrator** mới được dừng Giveaway!', ephemeral=True)
