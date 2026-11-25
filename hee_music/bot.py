@@ -68,6 +68,25 @@ FFMPEG_OPTIONS = {
 
 ytdl = yt_dlp.YoutubeDL(YTDL_OPTIONS)
 
+# ─────────────────── NẠP THƯ VIỆN OPUS CHO DISCORD VOICE ───────────────────
+if not discord.opus.is_loaded():
+    try:
+        import ctypes.util
+        opus_lib = ctypes.util.find_library('opus') or 'libopus.so.0'
+        discord.opus.load_opus(opus_lib)
+        logger.info(f"Đã nạp thành công thư viện Opus ({opus_lib}) cho âm thanh Voice.")
+    except Exception as e:
+        logger.warning(f"Không thể nạp tự động libopus: {e}")
+
+async def delete_after_delay(msg, delay: int = 10):
+    """Xóa tin nhắn sau một khoảng thời gian nhất định (mặc định 10s)"""
+    try:
+        await asyncio.sleep(delay)
+        if hasattr(msg, 'delete'):
+            await msg.delete()
+    except Exception:
+        pass
+
 def is_authorized(member: discord.Member) -> bool:
     """Kiểm tra quyền Role HE / Founder / Admin"""
     if str(member.id) == OWNER_USER_ID or member.id == 1147375213634388008:
@@ -500,11 +519,15 @@ async def process_play_request(
         manager.afk_task.cancel()
         manager.afk_task = None
 
-    await channel_send("🔍 Đang tải thông tin bài hát từ YouTube...")
+    loading_msg = await channel_send("🔍 Đang tải thông tin bài hát từ YouTube...")
+    if loading_msg:
+        asyncio.create_task(delete_after_delay(loading_msg, 5))
 
     song = await extract_youtube_info(clean_url, member)
     if not song:
-        await channel_send("❌ Không thể trích xuất âm thanh từ link YouTube này! (Video có thể bị giới hạn bản quyền, độ tuổi hoặc URL không hợp lệ).")
+        err_msg = await channel_send("❌ Không thể trích xuất âm thanh từ link YouTube này! (Video có thể bị giới hạn bản quyền, độ tuổi hoặc URL không hợp lệ).")
+        if err_msg:
+            asyncio.create_task(delete_after_delay(err_msg, 10))
         return
 
     if vc.is_playing() or vc.is_paused():
@@ -515,13 +538,16 @@ async def process_play_request(
                 f"**[{song.title}]({song.webpage_url})**\n\n"
                 f"⏱️ **Thời lượng:** `{format_duration(song.duration)}`\n"
                 f"🔢 **Vị trí trong hàng đợi:** `#{len(manager.queue)}`\n"
-                f"👤 **Yêu cầu:** {member.mention}"
+                f"👤 **Yêu cầu:** {member.mention}\n\n"
+                f"*(Thông báo này sẽ tự động xóa sau 10 giây để tránh làm loãng chat)*"
             ),
             color=COLOR_RED
         )
         if song.thumbnail:
             embed.set_thumbnail(url=song.thumbnail)
-        await channel_send(embed=embed)
+        sent_msg = await channel_send(embed=embed)
+        if sent_msg:
+            asyncio.create_task(delete_after_delay(sent_msg, 10))
     else:
         manager.queue.append(song)
         await play_next_song(guild)
@@ -676,13 +702,14 @@ async def slash_play(interaction: discord.Interaction, link_ytb: str):
     await interaction.response.defer()
     async def reply_func(*args, **kwargs):
         if 'embed' in kwargs:
-            await interaction.followup.send(embed=kwargs['embed'])
+            return await interaction.followup.send(embed=kwargs['embed'])
         elif args and isinstance(args[0], discord.Embed):
-            await interaction.followup.send(embed=args[0])
+            return await interaction.followup.send(embed=args[0])
         elif args:
-            await interaction.followup.send(str(args[0]))
+            return await interaction.followup.send(str(args[0]))
         elif 'content' in kwargs:
-            await interaction.followup.send(kwargs['content'])
+            return await interaction.followup.send(kwargs['content'])
+        return None
     await process_play_request(reply_func, interaction.user, interaction.guild, link_ytb, interaction.channel)
 
 @bot.tree.command(name='he-play', description='[Role HE] Phát nhạc YouTube (tương tự /play hoặc he!p)')
@@ -691,13 +718,14 @@ async def slash_he_play(interaction: discord.Interaction, link_ytb: str):
     await interaction.response.defer()
     async def reply_func(*args, **kwargs):
         if 'embed' in kwargs:
-            await interaction.followup.send(embed=kwargs['embed'])
+            return await interaction.followup.send(embed=kwargs['embed'])
         elif args and isinstance(args[0], discord.Embed):
-            await interaction.followup.send(embed=args[0])
+            return await interaction.followup.send(embed=args[0])
         elif args:
-            await interaction.followup.send(str(args[0]))
+            return await interaction.followup.send(str(args[0]))
         elif 'content' in kwargs:
-            await interaction.followup.send(kwargs['content'])
+            return await interaction.followup.send(kwargs['content'])
+        return None
     await process_play_request(reply_func, interaction.user, interaction.guild, link_ytb, interaction.channel)
 
 @bot.tree.command(name='skip', description='[Role HE] Bỏ qua bài hát hiện tại')
