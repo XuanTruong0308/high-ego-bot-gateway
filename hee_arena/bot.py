@@ -14,6 +14,7 @@ import json
 import random
 import logging
 from datetime import datetime
+from pathlib import Path
 
 import discord
 from discord import app_commands
@@ -37,6 +38,10 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stdout)],
 )
 logger = logging.getLogger('HEe.Arena')
+
+BASE_DIR                = Path(__file__).parent
+ASSETS_DIR              = BASE_DIR / "assets"
+TOURNAMENT_BANNER_GIF   = ASSETS_DIR / "tournament_banner.gif"
 
 BOT_TOKEN               = os.getenv('BOT_TOKEN', '')
 GUILD_ID                = int(os.getenv('GUILD_ID', '0'))
@@ -93,12 +98,67 @@ bot = ArenaBot()
 scrim_group = app_commands.Group(name='scrim', description='Hệ thống quản lý Scrims & Giải đấu High Ego eSport')
 
 
+# ─────────────────────────── LỆNH: ANNOUNCE TOURNAMENT ───────────────────────────
+
+@scrim_group.command(name='announce', description='[Role HE / Admin] Phát thông báo giải đấu / Scrims @everyone kèm Banner GIF động')
+@app_commands.describe(
+    tieu_de='Tiêu đề thông báo giải đấu (VD: ĐẠI CHIẾN LIÊN MINH HUYỀN THOẠI HEe #01)',
+    noi_dung='Nội dung, thể lệ, thời gian và cơ cấu giải thưởng',
+    kenh_thong_bao='Kênh muốn đăng thông báo (mặc định: kênh hiện tại)',
+    banner_url='Link Banner GIF từ Pinterest hoặc URL ảnh (để trống để dùng banner mặc định)'
+)
+async def cmd_scrim_announce(
+    interaction: discord.Interaction,
+    tieu_de: str,
+    noi_dung: str,
+    kenh_thong_bao: discord.TextChannel = None,
+    banner_url: str = None
+):
+    if not isinstance(interaction.user, discord.Member) or not has_he_role(interaction.user):
+        await interaction.response.send_message('❌ Chỉ có thành viên mang **Role HE** mới được phát thông báo giải đấu!', ephemeral=True)
+        return
+
+    target_channel = kenh_thong_bao or interaction.channel
+
+    embed = discord.Embed(
+        title=f'🏆 {tieu_de.strip().upper()}',
+        description=noi_dung.strip(),
+        color=COLOR_RED,
+        timestamp=datetime.now()
+    )
+    embed.set_author(
+        name=f'High Ego eSport — Arena Tournament',
+        icon_url=interaction.guild.icon.url if interaction.guild.icon else None
+    )
+    embed.set_footer(
+        text=f'Tổ chức bởi {interaction.user.display_name} • High Ego eSport',
+        icon_url=interaction.user.display_avatar.url
+    )
+
+    custom_gif = banner_url.strip() if banner_url else None
+    if custom_gif and (custom_gif.startswith("http://") or custom_gif.startswith("https://")):
+        embed.set_image(url=custom_gif)
+        await target_channel.send(content='@everyone', embed=embed)
+    elif TOURNAMENT_BANNER_GIF.exists():
+        file = discord.File(str(TOURNAMENT_BANNER_GIF), filename="tournament_banner.gif")
+        embed.set_image(url="attachment://tournament_banner.gif")
+        await target_channel.send(content='@everyone', embed=embed, file=file)
+    else:
+        await target_channel.send(content='@everyone', embed=embed)
+
+    await interaction.response.send_message(
+        f'✅ Đã phát thông báo giải đấu thành công tại {target_channel.mention}!',
+        ephemeral=True
+    )
+
+
 # ─────────────────────────── LỆNH: CREATE TOURNAMENT ───────────────────────────
 
-@scrim_group.command(name='create', description='Khởi tạo giải đấu / buổi Scrims mới')
+@scrim_group.command(name='create', description='Khởi tạo giải đấu / buổi Scrims mới kèm Banner')
 @app_commands.describe(
     ten_giai='Tên của giải đấu hoặc buổi Scrims',
-    the_thuc='Thể thức thi đấu: Mì ăn liền (Knockout) hoặc Vòng bảng -> Chung kết'
+    the_thuc='Thể thức thi đấu: Mì ăn liền (Knockout) hoặc Vòng bảng -> Chung kết',
+    banner_url='Link Banner GIF động từ Pinterest hoặc URL ảnh (tùy chọn)'
 )
 @app_commands.choices(the_thuc=[
     app_commands.Choice(name='⚡ Mì Ăn Liền (Loại trực tiếp / Knockout)', value='fast'),
@@ -107,7 +167,8 @@ scrim_group = app_commands.Group(name='scrim', description='Hệ thống quản 
 async def cmd_scrim_create(
     interaction: discord.Interaction,
     ten_giai: str,
-    the_thuc: app_commands.Choice[str]
+    the_thuc: app_commands.Choice[str],
+    banner_url: str = None
 ):
     if not isinstance(interaction.user, discord.Member) or not has_he_role(interaction.user):
         await interaction.response.send_message('❌ Chỉ có thành viên mang **Role HE** hoặc Quản trị viên mới được tạo giải!', ephemeral=True)
@@ -143,7 +204,17 @@ async def cmd_scrim_create(
         timestamp=datetime.now()
     )
     embed.set_footer(text='High Ego eSport • Arena System')
-    await interaction.response.send_message(embed=embed)
+
+    custom_gif = banner_url.strip() if banner_url else None
+    if custom_gif and (custom_gif.startswith("http://") or custom_gif.startswith("https://")):
+        embed.set_image(url=custom_gif)
+        await interaction.response.send_message(embed=embed)
+    elif TOURNAMENT_BANNER_GIF.exists():
+        file = discord.File(str(TOURNAMENT_BANNER_GIF), filename="tournament_banner.gif")
+        embed.set_image(url="attachment://tournament_banner.gif")
+        await interaction.response.send_message(embed=embed, file=file)
+    else:
+        await interaction.response.send_message(embed=embed)
 
 
 # ─────────────────────────── LỆNH: ADD TEAM ───────────────────────────
@@ -306,7 +377,12 @@ async def cmd_scrim_random(interaction: discord.Interaction):
                     match_num += 1
 
     embed.set_footer(text='Dùng /scrim start-match [mã_trận] để mở phòng Voice bảo mật và triệu tập 2 đội thi đấu!')
-    await interaction.followup.send(embed=embed)
+    if TOURNAMENT_BANNER_GIF.exists():
+        file = discord.File(str(TOURNAMENT_BANNER_GIF), filename="tournament_banner.gif")
+        embed.set_image(url="attachment://tournament_banner.gif")
+        await interaction.followup.send(embed=embed, file=file)
+    else:
+        await interaction.followup.send(embed=embed)
 
 
 # ─────────────────────────── LỆNH: START MATCH (TẠO VOICE RIÊNG) ───────────────────────────
