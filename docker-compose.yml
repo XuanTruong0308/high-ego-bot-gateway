@@ -38,6 +38,7 @@ services:
     env_file:
       - ./hee_ticket/.env
     volumes:
+      - ./hee_ticket:/app
       - ./hee_ticket/data:/app/data
       - ./shared_data:/shared_data:ro
       - ./hee_rank/data:/rank_data:ro
@@ -50,6 +51,7 @@ services:
     env_file:
       - ./hee_economy/.env
     volumes:
+      - ./hee_economy:/app
       - ./shared_data:/shared_data
       - ./hee_rank/data:/rank_data:ro
 
@@ -96,5 +98,6 @@ services:
     env_file:
       - ./hee_arena/.env
     volumes:
+      - ./hee_arena:/app
       - ./hee_arena/data:/app/data
 

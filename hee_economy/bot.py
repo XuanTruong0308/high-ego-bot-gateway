@@ -91,21 +91,6 @@ def get_user_rank_level(user_id: int, guild_id: int) -> tuple[float, int]:
         logger.warning(f"Lỗi đọc level rank: {e}")
     return 0.0, 0
 
-def verify_anti_clone(member: discord.Member) -> tuple[bool, str]:
-    """Kiểm tra điều kiện chống tài khoản ảo tham gia Daily: Acc Discord từ 3 tháng trở lên."""
-    now_utc = datetime.now(timezone.utc)
-    
-    # Tài khoản Discord phải từ 3 tháng trở lên (≥ 90 ngày)
-    if member.created_at:
-        acc_age_days = (now_utc - member.created_at).days
-        if acc_age_days < 90:
-            return False, (
-                f"🛡️ **Chống nick ảo:** Tài khoản Discord của bạn mới lập được **{acc_age_days} ngày**!\n"
-                f"Server yêu cầu tài khoản Discord phải hoạt động từ **3 tháng trở lên (≥ 90 ngày)** mới được phép điểm danh Daily."
-            )
-            
-    return True, ""
-
 class VaultBot(commands.Bot):
     def __init__(self):
         super().__init__(command_prefix='!', intents=intents)
