@@ -11,7 +11,9 @@ import os
 import sys
 import asyncio
 import logging
+import sqlite3
 from datetime import datetime
+from pathlib import Path
 
 import discord
 from discord import app_commands
@@ -58,6 +60,58 @@ def has_he_role(member: discord.Member) -> bool:
     if member.guild_permissions.administrator:
         return True
     return any(r.name == HE_ROLE_NAME or str(r.id) == HE_ROLE_NAME for r in member.roles)
+
+def get_user_economy_and_rank(user_id: int, guild_id: int) -> tuple[float, int]:
+    """Lấy (points, level) của user từ shared_data/economy.db và rank.db.
+    Level = int(xp // 100).
+    """
+    points = 0.0
+    level = 0
+
+    # 1. Đọc điểm thưởng từ economy.db
+    economy_paths = [
+        Path('/shared_data/economy.db'),
+        Path(__file__).parent.parent / 'shared_data' / 'economy.db',
+        Path(__file__).parent / 'data' / 'economy.db',
+    ]
+    econ_db = next((p for p in economy_paths if p.exists()), None)
+    if econ_db:
+        try:
+            with sqlite3.connect(econ_db) as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT points FROM user_balance WHERE user_id = ? AND guild_id = ?",
+                    (str(user_id), str(guild_id))
+                )
+                row = cursor.fetchone()
+                if row and row[0] is not None:
+                    points = float(row[0])
+        except Exception as e:
+            logger.error(f"Lỗi khi đọc economy.db: {e}")
+
+    # 2. Đọc xp & tính level từ rank.db (Level = xp // 100)
+    rank_paths = [
+        Path('/rank_data/rank.db'),
+        Path(__file__).parent.parent / 'hee_rank' / 'data' / 'rank.db',
+        Path(__file__).parent / 'data' / 'rank.db',
+    ]
+    rank_db = next((p for p in rank_paths if p.exists()), None)
+    if rank_db:
+        try:
+            with sqlite3.connect(rank_db) as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT xp FROM members WHERE user_id = ? AND guild_id = ?",
+                    (str(user_id), str(guild_id))
+                )
+                row = cursor.fetchone()
+                if row and row[0] is not None:
+                    xp = float(row[0])
+                    level = max(0, int(xp // 100))
+        except Exception as e:
+            logger.error(f"Lỗi khi đọc rank.db: {e}")
+
+    return points, level
 
 # ─────────────────── BUTTONS TRONG PHÒNG TICKET ───────────────────
 class TicketControlView(discord.ui.View):
@@ -143,6 +197,75 @@ class TicketCategorySelect(discord.ui.Select):
             'giai_dau': '🏆 Giải Đấu'
         }
         category_name = type_names.get(selected_type, 'Hỗ Trợ')
+
+        # Kiểm tra điều kiện riêng cho kênh Đổi Thưởng (Yêu cầu: ≥ 50 Điểm và Rank Level ≥ 5)
+        if selected_type == 'doi_thuong':
+            points, level = get_user_economy_and_rank(member.id, guild.id)
+            min_points = 50.0
+            min_level = 5
+
+            if points < min_points or level < min_level:
+                status_points = f"✅ Đạt ({points:.0f}/50)" if points >= min_points else f"❌ Chưa đạt ({points:.0f}/50)"
+                status_rank = f"✅ Đạt (Cấp {level}/5)" if level >= min_level else f"❌ Chưa đạt (Cấp {level}/5)"
+
+                dm_embed = discord.Embed(
+                    title="⛔ Yêu Cầu Tạo Ticket Đổi Thưởng Bị Từ Chối",
+                    description=(
+                        f"Xin chào **{member.display_name}**,\n\n"
+                        f"Hệ thống **HEe Tribunal** từ chối yêu cầu tạo ticket **Đổi Thưởng** của bạn do chưa thỏa mãn đủ tiêu chuẩn của cộng đồng High Ego eSport."
+                    ),
+                    color=COLOR_RED,
+                    timestamp=datetime.now()
+                )
+                dm_embed.add_field(
+                    name="📊 Tình Trạng Điều Kiện Hiện Tại",
+                    value=(
+                        f"• **Điểm thưởng khả dụng:** `{points:.0f} / 50 Điểm` — {status_points}\n"
+                        f"• **Cấp bậc Rank tương tác:** `Cấp {level} / Cấp 5` — {status_rank}\n"
+                    ),
+                    inline=False
+                )
+                dm_embed.add_field(
+                    name="📜 Quy Định Bắt Buộc",
+                    value=(
+                        f"Để tạo ticket đổi thưởng, bạn cần đạt **đồng thời cả 2 điều kiện**:\n"
+                        f"1. Tối thiểu **50 Điểm** tích lũy (tương đương 50.000 VNĐ).\n"
+                        f"2. Đạt tối thiểu **Cấp độ 5 (Level 5)** thông qua chat, thả cảm xúc hoặc tham gia Voice trong server."
+                    ),
+                    inline=False
+                )
+                dm_embed.add_field(
+                    name="💡 Hướng Dẫn Tích Lũy",
+                    value=(
+                        f"• Dùng lệnh `/daily` mỗi ngày tại kênh nhận thưởng để nhận điểm miễn phí.\n"
+                        f"• Tích cực giao lưu trò chuyện và sinh hoạt voice trong server để gia tăng cấp độ rank nhanh chóng!\n"
+                        f"• Dùng `/rank` và `/balance` để theo dõi tiến trình của bạn bất cứ lúc nào."
+                    ),
+                    inline=False
+                )
+                dm_embed.set_thumbnail(url=member.display_avatar.url)
+                dm_embed.set_footer(text="HEe eSport Security & Tribunal System")
+
+                dm_sent = False
+                try:
+                    await member.send(embed=dm_embed)
+                    dm_sent = True
+                except (discord.Forbidden, discord.HTTPException):
+                    pass
+
+                if dm_sent:
+                    await interaction.followup.send(
+                        "❌ **Bạn chưa đủ điều kiện tạo ticket Đổi Thưởng!**\n"
+                        "Lý do chi tiết và hướng dẫn đã được gửi vào **Tin nhắn riêng (DM)** của bạn. Vui lòng kiểm tra hộp thư Discord nhé!",
+                        ephemeral=True
+                    )
+                else:
+                    await interaction.followup.send(
+                        content="❌ **Bạn chưa đủ điều kiện tạo ticket Đổi Thưởng!** (Do bạn đóng DM nên bot hiển thị trực tiếp tại đây):",
+                        embed=dm_embed,
+                        ephemeral=True
+                    )
+                return
 
         # Tìm category ticket
         cat = None

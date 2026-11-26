@@ -137,13 +137,6 @@ async def cmd_daily(interaction: discord.Interaction):
         )
         return
 
-    member = interaction.user
-    if isinstance(member, discord.Member):
-        valid, anti_msg = verify_anti_clone(member)
-        if not valid:
-            await interaction.response.send_message(f'❌ {member.mention}\n{anti_msg}', ephemeral=True)
-            return
-
     success, msg, new_balance = economy_db.claim_daily(interaction.user.id, interaction.guild_id)
     if not success:
         await interaction.response.send_message(f'⏳ {interaction.user.mention}, {msg}', ephemeral=True)
@@ -155,7 +148,7 @@ async def cmd_daily(interaction: discord.Interaction):
             f'Chúc mừng {interaction.user.mention}!\n'
             f'{msg}\n\n'
             f'💰 **Số dư hiện tại:** `{new_balance:.1f} Điểm` ({int(new_balance * 1000):,} VNĐ)\n'
-            f'📌 *Điều kiện rút tiền: Tích lũy tối thiểu 50 Điểm (50k) và đạt tối thiểu **Rank Level 10** trong server.*'
+            f'📌 *Điều kiện rút tiền: Tích lũy tối thiểu 50 Điểm (50k) và đạt tối thiểu **Rank Level 5** trong server.*'
         ),
         color=COLOR_RED,
         timestamp=datetime.now()
@@ -186,26 +179,26 @@ async def cmd_balance(interaction: discord.Interaction, thanh_vien: discord.Memb
     embed.add_field(name='🎖️ Cấp Độ Rank', value=f'**Level {level}** (`{xp:,.0f} XP`)', inline=True)
     embed.add_field(name='⚠️ Cảnh Cáo Vi Phạm', value=f'{strikes} lần', inline=True)
 
-    # Điều kiện rút tiền: Điểm >= 50 VÀ Level >= 10
+    # Điều kiện rút tiền: Điểm >= 50 VÀ Level >= 5
     if points >= 50.0:
-        if level >= 10:
-            status_str = f"✅ **ĐỦ ĐIỀU KIỆN RÚT TIỀN!**\nBạn đã đạt `{points:.1f} Điểm` và Rank **Level {level}** (≥ Level 10). Hãy mở ticket hỗ trợ để nhận tiền mặt!"
+        if level >= 5:
+            status_str = f"✅ **ĐỦ ĐIỀU KIỆN RÚT TIỀN!**\nBạn đã đạt `{points:.1f} Điểm` và Rank **Level {level}** (≥ Level 5). Hãy mở ticket hỗ trợ để nhận tiền mặt!"
         else:
             status_str = (
                 f"🔒 **CHƯA ĐƯỢC PHÉP RÚT TIỀN:**\n"
-                f"Bạn đã có đủ `{points:.1f} Điểm` nhưng Rank hiện tại mới đạt **Level {level}/10**.\n"
-                f"👉 *Yêu cầu: Phải đạt tối thiểu **Rank Level 10** (tích cực chat & voice) mới được rút tiền!*"
+                f"Bạn đã có đủ `{points:.1f} Điểm` nhưng Rank hiện tại mới đạt **Level {level}/5**.\n"
+                f"👉 *Yêu cầu: Phải đạt tối thiểu **Rank Level 5** (tích cực chat & voice) mới được rút tiền!*"
             )
     else:
         remain_pts = 50.0 - points
         status_str = (
             f"⏳ **Chưa đủ điều kiện rút:**\n"
             f"- Cần thêm: `{remain_pts:.1f} Điểm` (Đạt tối thiểu 50k VNĐ)\n"
-            f"- Yêu cầu Rank: **Level 10** (Hiện tại: `Level {level}/10`)"
+            f"- Yêu cầu Rank: **Level 5** (Hiện tại: `Level {level}/5`)"
         )
 
     embed.add_field(name='Trạng Thái Quy Đổi Tiền Mặt', value=status_str, inline=False)
-    embed.set_footer(text='HEe Vault • 1 Điểm = 1,000 VNĐ • Điều kiện rút: Min 50 Điểm & Rank Level 10')
+    embed.set_footer(text='HEe Vault • 1 Điểm = 1,000 VNĐ • Điều kiện rút: Min 50 Điểm & Rank Level 5')
     await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name='point-add', description='[Founder Only] Cộng hoặc trừ điểm thành viên kèm lý do bắt buộc')

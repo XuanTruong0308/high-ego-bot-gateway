@@ -39,6 +39,8 @@ services:
       - ./hee_ticket/.env
     volumes:
       - ./hee_ticket/data:/app/data
+      - ./shared_data:/shared_data:ro
+      - ./hee_rank/data:/rank_data:ro
 
   vault:
     build:
