@@ -55,9 +55,17 @@ COLOR_BLUE  = 0x3B82F6
 
 intents = discord.Intents.default()
 intents.guilds = True
-intents.members = True
 intents.voice_states = True
-intents.message_content = True
+
+
+async def get_or_fetch_member(guild: discord.Guild, user_id: int) -> discord.Member | None:
+    m = guild.get_member(user_id)
+    if m:
+        return m
+    try:
+        return await guild.fetch_member(user_id)
+    except Exception:
+        return None
 
 
 def has_he_role(member: discord.Member) -> bool:
@@ -414,7 +422,7 @@ async def cmd_scrim_start_match(interaction: discord.Interaction, ma_tran: int):
 
     members_a_objs = []
     for uid in members_a_ids:
-        m = guild.get_member(int(uid))
+        m = await get_or_fetch_member(guild, int(uid))
         if m:
             members_a_objs.append(m)
             overwrites_a[m] = discord.PermissionOverwrite(view_channel=True, connect=True, speak=True)
@@ -429,7 +437,7 @@ async def cmd_scrim_start_match(interaction: discord.Interaction, ma_tran: int):
 
     members_b_objs = []
     for uid in members_b_ids:
-        m = guild.get_member(int(uid))
+        m = await get_or_fetch_member(guild, int(uid))
         if m:
             members_b_objs.append(m)
             overwrites_b[m] = discord.PermissionOverwrite(view_channel=True, connect=True, speak=True)
