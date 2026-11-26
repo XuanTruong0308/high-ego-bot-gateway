@@ -100,19 +100,17 @@ scrim_group = app_commands.Group(name='scrim', description='Hệ thống quản 
 
 # ─────────────────────────── LỆNH: ANNOUNCE TOURNAMENT ───────────────────────────
 
-@scrim_group.command(name='announce', description='[Role HE / Admin] Phát thông báo giải đấu / Scrims @everyone kèm Banner GIF động')
+@scrim_group.command(name='announce', description='[Role HE / Admin] Phát thông báo giải đấu / Scrims @everyone')
 @app_commands.describe(
-    tieu_de='Tiêu đề thông báo giải đấu (VD: ĐẠI CHIẾN LIÊN MINH HUYỀN THOẠI HEe #01)',
+    tieu_de='Tiêu đề thông báo giải đấu (VD: ĐẠI CHIẾN SCRIMS HEe #01)',
     noi_dung='Nội dung, thể lệ, thời gian và cơ cấu giải thưởng',
-    kenh_thong_bao='Kênh muốn đăng thông báo (mặc định: kênh hiện tại)',
-    banner_url='Link Banner GIF từ Pinterest hoặc URL ảnh (để trống để dùng banner mặc định)'
+    kenh_thong_bao='Kênh muốn đăng thông báo (mặc định: kênh hiện tại)'
 )
 async def cmd_scrim_announce(
     interaction: discord.Interaction,
     tieu_de: str,
     noi_dung: str,
-    kenh_thong_bao: discord.TextChannel = None,
-    banner_url: str = None
+    kenh_thong_bao: discord.TextChannel = None
 ):
     if not isinstance(interaction.user, discord.Member) or not has_he_role(interaction.user):
         await interaction.response.send_message('❌ Chỉ có thành viên mang **Role HE** mới được phát thông báo giải đấu!', ephemeral=True)
@@ -135,11 +133,7 @@ async def cmd_scrim_announce(
         icon_url=interaction.user.display_avatar.url
     )
 
-    custom_gif = banner_url.strip() if banner_url else None
-    if custom_gif and (custom_gif.startswith("http://") or custom_gif.startswith("https://")):
-        embed.set_image(url=custom_gif)
-        await target_channel.send(content='@everyone', embed=embed)
-    elif TOURNAMENT_BANNER_GIF.exists():
+    if TOURNAMENT_BANNER_GIF.exists():
         file = discord.File(str(TOURNAMENT_BANNER_GIF), filename="tournament_banner.gif")
         embed.set_image(url="attachment://tournament_banner.gif")
         await target_channel.send(content='@everyone', embed=embed, file=file)
@@ -154,11 +148,10 @@ async def cmd_scrim_announce(
 
 # ─────────────────────────── LỆNH: CREATE TOURNAMENT ───────────────────────────
 
-@scrim_group.command(name='create', description='Khởi tạo giải đấu / buổi Scrims mới kèm Banner')
+@scrim_group.command(name='create', description='Khởi tạo giải đấu / buổi Scrims mới')
 @app_commands.describe(
     ten_giai='Tên của giải đấu hoặc buổi Scrims',
-    the_thuc='Thể thức thi đấu: Mì ăn liền (Knockout) hoặc Vòng bảng -> Chung kết',
-    banner_url='Link Banner GIF động từ Pinterest hoặc URL ảnh (tùy chọn)'
+    the_thuc='Thể thức thi đấu: Mì ăn liền (Knockout) hoặc Vòng bảng -> Chung kết'
 )
 @app_commands.choices(the_thuc=[
     app_commands.Choice(name='⚡ Mì Ăn Liền (Loại trực tiếp / Knockout)', value='fast'),
@@ -167,8 +160,7 @@ async def cmd_scrim_announce(
 async def cmd_scrim_create(
     interaction: discord.Interaction,
     ten_giai: str,
-    the_thuc: app_commands.Choice[str],
-    banner_url: str = None
+    the_thuc: app_commands.Choice[str]
 ):
     if not isinstance(interaction.user, discord.Member) or not has_he_role(interaction.user):
         await interaction.response.send_message('❌ Chỉ có thành viên mang **Role HE** hoặc Quản trị viên mới được tạo giải!', ephemeral=True)
@@ -205,11 +197,7 @@ async def cmd_scrim_create(
     )
     embed.set_footer(text='High Ego eSport • Arena System')
 
-    custom_gif = banner_url.strip() if banner_url else None
-    if custom_gif and (custom_gif.startswith("http://") or custom_gif.startswith("https://")):
-        embed.set_image(url=custom_gif)
-        await interaction.response.send_message(embed=embed)
-    elif TOURNAMENT_BANNER_GIF.exists():
+    if TOURNAMENT_BANNER_GIF.exists():
         file = discord.File(str(TOURNAMENT_BANNER_GIF), filename="tournament_banner.gif")
         embed.set_image(url="attachment://tournament_banner.gif")
         await interaction.response.send_message(embed=embed, file=file)

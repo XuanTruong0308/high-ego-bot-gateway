@@ -246,12 +246,6 @@ class EventAnnounceModal(discord.ui.Modal, title='Soạn Thông Báo Sự Kiện
         max_length=2000,
         required=True
     )
-    banner_url = discord.ui.TextInput(
-        label='Link Banner GIF (Pinterest / URL ảnh)',
-        placeholder='Dán link GIF từ Pinterest hoặc để trống để dùng banner mặc định...',
-        max_length=500,
-        required=False
-    )
 
     def __init__(self, target_channel: discord.TextChannel):
         super().__init__()
@@ -273,11 +267,7 @@ class EventAnnounceModal(discord.ui.Modal, title='Soạn Thông Báo Sự Kiện
             icon_url=interaction.user.display_avatar.url
         )
 
-        custom_gif = self.banner_url.value.strip() if self.banner_url.value else None
-        if custom_gif and (custom_gif.startswith("http://") or custom_gif.startswith("https://")):
-            embed.set_image(url=custom_gif)
-            await self.target_channel.send(content='@everyone', embed=embed)
-        elif EVENT_BANNER_GIF.exists():
+        if EVENT_BANNER_GIF.exists():
             file = discord.File(str(EVENT_BANNER_GIF), filename="event_banner.gif")
             embed.set_image(url="attachment://event_banner.gif")
             await self.target_channel.send(content='@everyone', embed=embed, file=file)
