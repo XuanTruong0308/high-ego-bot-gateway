@@ -92,9 +92,16 @@ bot = SentinelBot()
 
 # Helper kiểm tra role HE
 def has_he_role(member: discord.Member) -> bool:
-    if member.guild_permissions.administrator:
+    if member.guild.owner_id == member.id:
         return True
-    return any(r.name == HE_ROLE_NAME or str(r.id) == HE_ROLE_NAME for r in member.roles)
+    if member.guild_permissions.administrator or member.guild_permissions.manage_messages:
+        return True
+    return any(
+        r.name == HE_ROLE_NAME
+        or str(r.id) == HE_ROLE_NAME
+        or r.name.lower() in ('he', 'role he', 'admin', 'mod', 'quản trị viên')
+        for r in member.roles
+    )
 
 # ─────────────────────────── SỰ KIỆN 1: LỌC TỪ TỤC TĨU ───────────────────
 @bot.event
@@ -171,39 +178,59 @@ async def on_message(message: discord.Message):
 
     await bot.process_commands(message)
 
-# ─────────────────── SỰ KIỆN 2: ROLE HE THẢ TICK XANH XÓA SAU 5S ─────────
+# ─────────────────── SỰ KIỆN 2: ROLE HE / ADMIN THẢ TICK XANH XÓA TIN NHẮN ──
 @bot.event
 async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
     if not payload.guild_id or payload.guild_id != GUILD_ID:
         return
 
-    # Chỉ bắt icon tick xanh chuẩn: '✅'
-    emoji_str = str(payload.emoji.name)
-    if emoji_str not in ('✅', 'white_check_mark'):
+    # Chấp nhận mọi biến thể của tick: ✅, ✔️, ☑️, custom tick emoji
+    emoji_name = str(payload.emoji.name).lower()
+    is_tick = (
+        payload.emoji.name in ('✅', '✔️', '☑️')
+        or emoji_name in ('white_check_mark', 'heavy_check_mark', 'ballot_box_with_check', 'tick', 'check')
+        or 'check' in emoji_name
+        or 'tick' in emoji_name
+    )
+    if not is_tick:
         return
 
     guild = bot.get_guild(payload.guild_id)
     if not guild:
         return
 
+    # Lấy thông tin member (tự fallback nếu payload.member bị None trên Discord Gateway)
     member = payload.member
-    if not member or member.bot:
+    if not member:
+        member = guild.get_member(payload.user_id)
+    if not member:
+        try:
+            member = await guild.fetch_member(payload.user_id)
+        except Exception:
+            return
+
+    if member.bot:
         return
 
-    # Kiểm tra xem người thả có Role HE hoặc Admin không
+    # Kiểm tra xem người thả có Role HE, Admin, Manage Messages hoặc là Owner không
     if not has_he_role(member):
+        logger.info(f'[QuickDelete] Bỏ qua vì {member} không có quyền xóa tin nhắn.')
         return
 
-    channel = guild.get_channel(payload.channel_id)
+    # Lấy channel an toàn (hỗ trợ cả thread, voice text...)
+    channel = bot.get_channel(payload.channel_id)
     if not channel:
-        return
+        try:
+            channel = await bot.fetch_channel(payload.channel_id)
+        except Exception:
+            return
 
     try:
         target_message = await channel.fetch_message(payload.message_id)
     except (discord.NotFound, discord.Forbidden):
         return
 
-    logger.info(f'[QuickDelete] Role HE ({member}) đã thả ✅ vào tin nhắn của {target_message.author}. Chuẩn bị xóa sau 5s...')
+    logger.info(f'[QuickDelete] {member} đã thả tick ({payload.emoji.name}) vào tin nhắn của {target_message.author}. Xóa sau 1s...')
 
     # Báo phản hồi bằng reaction đồng hồ cát ⏳
     try:
@@ -211,8 +238,8 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
     except Exception:
         pass
 
-    # Đợi đúng 5 giây
-    await asyncio.sleep(5)
+    # Đợi 1 giây để người dùng thấy phản hồi
+    await asyncio.sleep(1)
 
     # Thực hiện xóa tin nhắn
     try:
