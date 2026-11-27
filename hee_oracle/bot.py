@@ -529,6 +529,7 @@ async def cmd_power_picks(interaction: discord.Interaction, lane: app_commands.C
                 counter_lines.append(f"  • **{c['champ']}** ({c['wr']} WR vs {p['name']}): {c['reason']}")
             
             counter_str = "\n".join(counter_lines)
+            champ_slug = p["name"].lower().replace("'", "")
             field_val = (
                 f'🔥 **Vị thế:** `{p["tier"]}` | WR: **{p["win_rate"]}** | Ban Rate: **{p["ban_rate"]}**\n'
                 f'💡 **Lý do mạnh:** {p["why_hot"]}\n'
@@ -536,7 +537,7 @@ async def cmd_power_picks(interaction: discord.Interaction, lane: app_commands.C
                 f'🌿 **Ngọc:** {p["runes"]}\n\n'
                 f'⚔️ **Top Tướng Khắc Chế Cứng (Data OP.GG):**\n{counter_str}\n'
                 f'🛡️ **Chiến thuật bẻ gãy:** {p["counter_strategy"]}\n'
-                f'🔗 [OP.GG Counters](https://www.op.gg/champions/{p["name"].lower().replace("\'", "")}/counters/{l_key}) • [DeepLoL Pro Tracker](https://www.deeplol.gg/champions/{p["name"].lower().replace("\'", "")}/build)'
+                f'🔗 [OP.GG Counters](https://www.op.gg/champions/{champ_slug}/counters/{l_key}) • [DeepLoL Pro Tracker](https://www.deeplol.gg/champions/{champ_slug}/build)'
             )
             embed.add_field(name=f'{lane_labels[l_key]} — {p["name"].upper()}', value=field_val, inline=False)
 
