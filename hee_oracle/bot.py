@@ -43,6 +43,9 @@ BOT_TOKEN       = os.getenv('BOT_TOKEN', '')
 GUILD_ID        = int(os.getenv('GUILD_ID', '0'))
 HE_ROLE_NAME    = os.getenv('HE_ROLE_NAME', 'HE')
 
+BASE_DIR        = Path(__file__).parent
+ASSETS_DIR      = BASE_DIR / "assets"
+
 COLOR_GOLD      = 0xF59E0B
 COLOR_CYAN      = 0x06B6D4
 COLOR_RED       = 0xEF4444
@@ -561,6 +564,9 @@ async def cmd_vision(interaction: discord.Interaction, muc_tieu: app_commands.Ch
         await interaction.response.send_message('❌ Không tìm thấy thông tin mục tiêu!', ephemeral=True)
         return
 
+    map_filename = f"map_{muc_tieu.value}.png"
+    map_path = ASSETS_DIR / map_filename
+
     embed = discord.Embed(
         title=tactic["title"],
         description=f'**Thời điểm chuẩn bị:** `{tactic["timing"]}`',
@@ -574,10 +580,14 @@ async def cmd_vision(interaction: discord.Interaction, muc_tieu: app_commands.Ch
     embed.add_field(name='📍 Tọa Độ Cắm Mắt Then Chốt', value=ward_text, inline=False)
 
     embed.add_field(name='🧹 Nguyên Tắc Phá Tầm Nhìn Đối Phương', value=tactic["deward_tip"], inline=False)
-    embed.add_field(name='🗺️ Sơ Đồ Chiến Thuật Vị Trí Mắt', value=tactic["ascii_map"], inline=False)
-
     embed.set_footer(text='High Ego eSport • Cẩm Nang Hỗ Trợ Kiểm Soát Tầm Nhìn')
-    await interaction.response.send_message(embed=embed)
+
+    if map_path.exists():
+        file = discord.File(str(map_path), filename=map_filename)
+        embed.set_image(url=f"attachment://{map_filename}")
+        await interaction.response.send_message(embed=embed, file=file)
+    else:
+        await interaction.response.send_message(embed=embed)
 
 
 # ─────────────────────────── LỆNH 9: VÒNG RỪNG & ĐỘT BIẾN PRO LCK/VCS ───────────────────────────
