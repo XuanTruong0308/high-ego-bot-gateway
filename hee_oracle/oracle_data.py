@@ -357,3 +357,326 @@ def analyze_composition(top: str, jg: str, mid: str, adc: str, sup: str) -> dict
         "target_bans": list(target_bans)[:4],
         "missing_champs": missing_champs
     }
+
+
+# ─────────────────────────── BẢN ĐỒ CHIẾN THUẬT CẮM MẮT (SUPPORT MACRO) ───────────────────────────
+
+VISION_TACTICS = {
+    "voidgrubs": {
+        "title": "👾 BẢN ĐỒ CẮM MẮT SÂU HƯ KHÔNG (VOIDGRUBS 5:00)",
+        "timing": "⏰ Phút 4:15 - 4:45 (Trước khi Sâu ra 30 - 45 giây)",
+        "support_rotation": (
+            "1. Hỗ trợ đẩy lính Bot đợt 3/4 sát trụ địch.\n"
+            "2. Biến về mua ngay **Mắt Kiểm Soát (Pink Ward)** + Giày.\n"
+            "3. Di chuyển thẳng từ bệ đá cổ ra Mid / Sông Trên hội quân cùng Rừng."
+        ),
+        "ward_spots": [
+            "🔴 **Deep Ward (Cửa Rừng Địch):** Bụi ngã ba phía sau bùa Đỏ/Xanh của đối phương để phát hiện hướng di chuyển Rừng địch từ sớm.",
+            "🟡 **Pixel Bush (Bụi Sông Giữa):** Kiểm soát hướng di chuyển của Mid địch khi đối phương đảo lên tranh chấp.",
+            "🟣 **Mắt Kiểm Soát (Trong Hang Sâu):** Cắm sát mép hang để triệt tiêu toàn bộ mắt đối phương cắm qua tường.",
+            "🔵 **Bụi Cỏ Chóp Sông (River Bush):** Đảm bảo góc rút lui an toàn cho team khi ăn xong."
+        ],
+        "deward_tip": "Bật Máy Quét (Oracle Lens) quét từ ngã ba sông trên vào hang sâu. Ép đối phương vào bóng tối hoàn toàn.",
+        "ascii_map": (
+            "```\n"
+            "            [TOP LANE]\n"
+            "                \\\n"
+            "      [Deep Ward 🔴] \\ \n"
+            "              \\   [Hang Sâu 🟣]\n"
+            "     [Rừng Địch] \\     /\n"
+            "                   [Sông Trên 🔵]\n"
+            "                       |\n"
+            "               [Pixel Bush 🟡]\n"
+            "                       |\n"
+            "                   [MID LANE]\n"
+            "```"
+        )
+    },
+    "early_dragon": {
+        "title": "🐉 BẢN ĐỒ CẮM MẮT HANG RỒNG (DRAGON 1 & 2)",
+        "timing": "⏰ Trước khi Rồng xuất hiện 1 phút (Phút 4:00 cho Rồng 1, hoặc 45s trước Rồng 2)",
+        "support_rotation": (
+            "1. Lấy quyền ưu tiên đường dưới (Prio Bot) để Xạ Thủ có thể hỗ trợ trước đối phương.\n"
+            "2. Hỗ trợ đi cùng Rừng cắm tam giác tầm nhìn, cấm đi lẻ 1 mình khi không có thông tin Rừng địch."
+        ),
+        "ward_spots": [
+            "🟣 **Mắt Kiểm Soát (Hang Rồng):** Đặt sâu trong hốc hang Rồng (áp sát vách sau hang để đối phương không thể đánh lén).",
+            "🔴 **Bụi Ba Ngã (Tri-bush) hoặc Lối ra bùa Xanh/Đỏ địch:** Bắt bài góc tiến ra sông của bộ đôi Bot & Rừng đối thủ.",
+            "🟡 **Bụi Chuối / Pixel Bush Sông Dưới:** Soi góc di chuyển của Mid đối phương khi bọc xuống.",
+            "🔵 **Mắt Sâu (Deep Ward bờ sông):** Cho phép Xạ thủ tự tin đứng xả kỹ năng từ xa."
+        ],
+        "deward_tip": "Quét sạch mắt cắm trong bụi ba ngã. Nếu đối thủ cắm mắt qua tường hang Rồng, phá ngay lập tức.",
+        "ascii_map": (
+            "```\n"
+            "                   [MID LANE]\n"
+            "                       |\n"
+            "               [Pixel Bush 🟡]\n"
+            "                       |\n"
+            "              /   [Hang Rồng 🟣]\n"
+            "     [Rừng Địch] /     \\\n"
+            "      [Tri-Bush 🔴]   [Sông Dưới 🔵]\n"
+            "                /       \\\n"
+            "            [BOT LANE]\n"
+            "```"
+        )
+    },
+    "baron_setup": {
+        "title": "👑 MẠNG LƯỚI TẦM NHÌN HANG BARON (BARON 20:00+)",
+        "timing": "⏰ Trước khi Baron ra 1 phút 15 giây (Phút 18:45 - 19:15)",
+        "support_rotation": (
+            "1. Hỗ Trợ đi kèm Đỡ Đòn / Rừng theo cặp (Bảo đảm an toàn tuyệt đối khi tiến vào vùng tối).\n"
+            "2. Thiết lập tầm nhìn theo nguyên tắc **Từ Gần Ra Xa (Front-to-Deep)**."
+        ),
+        "ward_spots": [
+            "🔴 **Deep Ward 1 (Bụi Chim Quỷ Biến Dị):** Phát hiện toàn bộ đường ra sông của đối thủ từ căn cứ.",
+            "🔴 **Deep Ward 2 (Ngã Ba Bùa Đỏ / Xanh đối phương):** Bắt góc bọc sườn của Đấu Sĩ / Sát Thủ đối phương.",
+            "🟣 **Mắt Kiểm Soát (Cửa Hang Baron):** Vô hiệu hóa mắt cắm của đối phương và ép đối thủ phải mò mẫm đi vào.",
+            "🟡 **Bụi Chuối / Bụi Sông Trước Cửa Baron:** Thiết lập **Bẫy Bụi Tử Thần (Death Bush)** để bắt lẻ người đi kiểm tra tầm nhìn."
+        ],
+        "deward_tip": "Dùng Máy Quét hoặc Tàn Tích Bóng Tối Umbral Glaive dọn sạch mắt cắm qua vách tường sau hang Baron.",
+        "ascii_map": (
+            "```\n"
+            "         [Rừng Địch 🔴 Deep Ward]\n"
+            "               |          |\n"
+            "       [Ngã Ba 🔴]    [Bụi Chim 🔴]\n"
+            "               \\          /\n"
+            "            [Hang Baron 🟣 Mắt Tím]\n"
+            "                  /\n"
+            "         [Death Bush 🟡 Bẫy Bụi]\n"
+            "                |\n"
+            "            [Sông Giữa]\n"
+            "```"
+        )
+    },
+    "anti_dive_bot": {
+        "title": "🛡️ BẢN ĐỒ TẦM NHÌN CHỐNG DIVE TRỤ ĐƯỜNG DƯỚI",
+        "timing": "⏰ Phút 2:40 - 3:20 (Khi Rừng đối phương hoàn thành vòng rừng 3 bãi hoặc Full Clear để chuẩn bị Dive)",
+        "support_rotation": (
+            "1. Khi thấy đường bị đẩy lùi và đợt lính lớn của địch (2-3 đàn lính) chuẩn bị tràn vào trụ.\n"
+            "2. Ping cảnh báo Rừng hoặc Mid di chuyển bọc lót ngay khi thấy đối thủ có ý đồ băng trụ."
+        ),
+        "ward_spots": [
+            "🔴 **Ngách Hẻm Sau Trụ 1 (Bụi Vòng Lưng):** Phát hiện góc Rừng đối thủ vòng qua ngõ hẹp sau trụ để kẹp chả.",
+            "🟡 **Bụi Chóp Sông (River Bush):** Phát hiện Mid đối thủ mất tích đảo xuống.",
+            "🟣 **Bụi Cỏ Sát Trụ 1:** Đảm bảo không bị Sát Thủ núp trong góc khuất tầm nhìn."
+        ],
+        "deward_tip": "Nếu thấy Rừng đối phương đã có mặt sau trụ, chủ động bỏ trụ lùi về trụ 2 bảo toàn mạng sống.",
+        "ascii_map": (
+            "```\n"
+            "     [Sông Dưới 🟡 Mắt Báo Động]\n"
+            "            \\\n"
+            "        [Lính Địch Đẩy Tràn]\n"
+            "            \\\n"
+            "        [Trụ 1 Bot 🟣] <--- [Góc Bọc Hậu Sau Trụ 🔴 Mắt Tử Thủ]\n"
+            "            |\n"
+            "       [Rút Về Trụ 2]\n"
+            "```"
+        )
+    }
+}
+
+
+# ─────────────────────────── VÒNG RỪNG & ĐỘT BIẾN PRO LCK/VCS (JUNGLE MACRO) ───────────────────────────
+
+JUNGLE_META = {
+    "sejuani": {
+        "name": "Sejuani", "tier": "S+ Tier Pro",
+        "archetype": "Đỡ đòn mở giao tranh & Kiểm soát mục tiêu",
+        "primary_path": "Bùa Đỏ ➔ Người Đá (Krugs) ➔ Bãi Chim (Raptors) ➔ Sói ➔ Bùa Xanh ➔ Cóc (Gromp) [Full Clear 3:15] ➔ Cua Sông",
+        "fast_path": "Bùa Đỏ ➔ Bãi Chim ➔ Bùa Xanh ➔ Cóc ➔ Gank Cánh Trên phút 2:45 lấy Sâu Hư Không",
+        "spike_levels": "⚡ Cấp 3 (Kèo 2v2 cực mạnh với Mid cận chiến) • 👑 Cấp 6 (Chiêu cuối R mở giao tranh tầm xa 1000 range)",
+        "dive_potential": "Cực Cao: Đỡ đòn bằng nội tại Giáp Băng chống trụ, Q hất tung và E đóng băng kẻ địch dưới chân trụ.",
+        "lck_pro_tactics": "Tại LCK (Peanut / Canyon), Sejuani luôn ưu tiên dọn rừng hướng lên Cánh Trên (Pathing towards Top) để can thiệp Sâu Hư Không phút thứ 5. Phối hợp với Yone, Sylas hoặc Renekton đảm bảo 100% mạng gank."
+    },
+    "jarvan iv": {
+        "name": "Jarvan IV", "tier": "S Tier Pro",
+        "archetype": "Đấu sĩ gank sớm & Womb-Combo giao tranh",
+        "primary_path": "Bùa Đỏ ➔ Cóc (Gromp) ➔ Bùa Xanh ➔ Gank ngay phút 2:35 trước khi bot/top đối phương kịp cắm mắt",
+        "fast_path": "Bùa Đỏ ➔ Người Đá ➔ Chim ➔ Sói ➔ Bùa Xanh ➔ Cóc ➔ Cua (Dọn sạch 3:18)",
+        "spike_levels": "⚡ Cấp 2-3 (Combo E-Q hất tung sốc dame) • 👑 Cấp 6 (Đại Địa Chấn R nhốt ép Tốc Biến đối thủ)",
+        "dive_potential": "Rất Cao: E-Q hất tung vượt tầm trụ, R cô lập đối phương dưới trụ cho đồng đội dồn sát thương.",
+        "lck_pro_tactics": "Phong cách VCS: Jarvan IV thường xuyên bỏ nửa bãi trên để gank bot sớm, thiết lập thế snowball cho Xạ thủ và ăn Rồng đầu. Combo với Orianna (Quả cầu gắn vào Jarvan khi E-Q vào)."
+    },
+    "vi": {
+        "name": "Vi", "tier": "S Tier Pro",
+        "archetype": "Đấu sĩ bắt chết chủ lực (Point-and-Click Lock)",
+        "primary_path": "Full Clear 6 bãi (Bùa Xanh ➔ Cóc ➔ Sói ➔ Chim ➔ Bùa Đỏ ➔ Người Đá) kết thúc lúc 3:15, ăn Cua an toàn",
+        "fast_path": "Bùa Đỏ ➔ Chim ➔ Bùa Xanh ➔ Cóc ➔ Gank Mid/Top",
+        "spike_levels": "⚡ Cấp 3 (Q lướt đấm phá giáp) • 👑 Cấp 6 (R Tả Xung Hữu Đột không thể bị cản phá)",
+        "dive_potential": "Cực Đại ở Cấp 6: R khóa chết tướng địch dưới trụ không thể né tránh, Q dứt điểm rồi lướt ra an toàn.",
+        "lck_pro_tactics": "Lựa chọn số 1 của Oner (T1) khi đối đầu các siêu xạ thủ thiếu cơ động (Jinx, Aphelios, Varus). Tận dụng Q vượt tường né mắt cắm ở sông để tiếp cận góc gank bất ngờ."
+    },
+    "maokai": {
+        "name": "Maokai", "tier": "S Tier Pro",
+        "archetype": "Kiểm soát bản đồ & Tầm nhìn toàn diện",
+        "primary_path": "Full Clear 6 bãi siêu nhanh nhờ Chồi non E và Q quét quái diện rộng (Hoàn thành lúc 3:12)",
+        "fast_path": "Bùa Đỏ ➔ Bãi Chim ➔ Sói ➔ Bùa Xanh ➔ Cóc ➔ Can thiệp Cua Sông",
+        "spike_levels": "⚡ Cấp 3 (W Trói trừng phạt gank) • 👑 Cấp 6 (Quyền Lực Thiên Nhiên R bao trọn cả khúc sông)",
+        "dive_potential": "Cao: Dùng W né đòn đánh của trụ và trói giữ chân đối thủ cho đồng đội xả chiêu.",
+        "lck_pro_tactics": "Đặc sản LCK: Ném chồi non E vào bụi cỏ tranh chấp trước 1 phút giao tranh rồng/baron, lấy thông tin vị trí và làm chậm ngăn đối phương tiếp cận mục tiêu lớn."
+    },
+    "xin zhao": {
+        "name": "Xin Zhao", "tier": "S Tier Pro",
+        "archetype": "Đấu sĩ tay đôi mạnh & Chặn đạn pháo bảo kê",
+        "primary_path": "Bùa Đỏ ➔ Người Đá ➔ Chim ➔ Sói ➔ Bùa Xanh ➔ Cóc (Tay đôi thắng hầu hết rừng đối phương cấp 3 tại Cua)",
+        "fast_path": "Bùa Đỏ ➔ Cóc ➔ Bùa Xanh ➔ Can thiệp đường hoặc cướp rừng",
+        "spike_levels": "⚡ Cấp 3 (Khỏe vô địch trong các kèo 1v1 hoặc 2v2 cua) • 👑 Cấp 6 (R Bán Nguyệt Thương kháng đạn tầm xa)",
+        "dive_potential": "Khá: Dùng E lướt vào hất tung Q3, bật R chặn đạn tầm xa khi thoát trụ.",
+        "lck_pro_tactics": "Khắc chế cứng các đội hình cấu rỉa Poke hoặc Hypercarry xạ thủ. R Bán Nguyệt Thương bật lên chặn toàn bộ đạn đạo từ tuyến sau đối phương, tạo không gian an toàn cho team ăn mục tiêu."
+    },
+    "nidalee": {
+        "name": "Nidalee", "tier": "A+ Tier (Skill Cap Cực Cao)",
+        "archetype": "Sát thủ xâm lăng Snowball (High Risk - High Reward)",
+        "primary_path": "Bùa Đỏ ➔ Bãi Chim ➔ Bùa Xanh ➔ Xâm lăng rừng đối thủ cấp 3 để cướp bóc hoặc hạ gục rừng ăn chậm",
+        "fast_path": "Full clear siêu tốc < 3:05 nhờ biến đổi dạng Báo dọn bãi",
+        "spike_levels": "⚡ Cấp 3 (Đột biến tối đa khi ném lao Q trúng và dạng Báo cắn xé dứt điểm)",
+        "dive_potential": "Cực Mạnh: Ném lao cấu rỉa trước khi lính vào, biến Báo nhảy cắn dứt điểm và Tốc Biến / W thoát trụ.",
+        "lck_pro_tactics": "Chỉ pick khi các đường solo có CC chỉ định (Renekton, Twisted Fate, Nautilus) để setup lao chắc chắn trúng 100%. Áp đảo tuyệt đối thế trận đầu game."
+    },
+    "nocturne": {
+        "name": "Nocturne", "tier": "S Tier Pro",
+        "archetype": "Sát thủ bóng tối & Tắt đèn bắt lẻ",
+        "primary_path": "Tập trung Full Clear 6 bãi nhanh nhất có thể để rush Level 6 (Hạn chế gank trước cấp 6)",
+        "fast_path": "Bùa Xanh ➔ Cóc ➔ Sói ➔ Chim ➔ Đỏ ➔ Người Đá ➔ Biến về mua Rìu Tiamat / Đồ sát lực",
+        "spike_levels": "👑 Cấp 6 (Đột biến toàn cầu: R Hoang Tưởng tắt đèn toàn bản đồ bắt lẻ)",
+        "dive_potential": "Cực Mạnh ở Cấp 6: Tắt đèn không cho đối phương hỗ trợ nhau, W chặn chiêu khống chế của trụ hoặc đối thủ.",
+        "lck_pro_tactics": "Tuyệt chiêu LCK: R Hoang Tưởng tắt toàn bộ tầm nhìn đối phương, vô hiệu hóa Dịch Chuyển và bảo kê của đối thủ. Kết hợp cùng Neeko / Orianna tạo combo ập vào không lối thoát."
+    }
+}
+
+
+# ─────────────────────────── MA TRẬN POWER PICKS & COUNTERS THEO LANE ───────────────────────────
+
+POWER_PICKS = {
+    "top": [
+        {
+            "name": "Rumble", "tier": "S+ (God Tier)", "win_rate": "53.2%", "ban_rate": "42%",
+            "why_hot": "Hưởng lợi lớn từ buff Mặt Nạ Liandry và khả năng ép góc tuyệt đối tại hang Sâu Hư Không & Rồng bằng Mưa Tên Lửa (R).",
+            "core_build": "Mặt Nạ Liandry ➔ Đồng Hồ Cát Zhonya ➔ Trượng Hư Vô",
+            "runes": "Thiên Thạch Bí Ẩn • Áo Choàng Mây • Tập Trung Tuyệt Đối • Thiêu Rụi",
+            "counters": [
+                {"champ": "Tahm Kench", "wr": "55.4%", "reason": "Quá trâu bò, nuốt cô lập và nuốt đồng đội cứu khỏi Mưa Tên Lửa."},
+                {"champ": "Jayce", "wr": "53.8%", "reason": "Đẩy lính và cấu rỉa tầm xa ngoài tầm phun lửa của Rumble."},
+                {"champ": "Gwen", "wr": "53.1%", "reason": "Sương Lam Bất Tử (W) miễn nhiễm hoàn toàn chiêu cuối của Rumble từ xa."}
+            ],
+            "counter_strategy": "Lên Giày Thủy Ngân + Áo Choàng Ám Ảnh lần về đầu. Ép giao tranh khi Nhiệt của Rumble dưới 40% hoặc khi hắn vừa quá nhiệt tự câm lặng."
+        },
+        {
+            "name": "K'Sante", "tier": "S+ (Pro Priority)", "win_rate": "51.8%", "ban_rate": "48%",
+            "why_hot": "Độ đa dụng tối đa trong thi đấu chuyên nghiệp: Vừa là Đỡ Đòn vững chắc vừa có thể bật Khô Máu (R) thành Đấu Sĩ sát thủ.",
+            "core_build": "Găng Tay Băng Hỏa ➔ Giáp Gai ➔ Băng Giáp / Jak'Sho",
+            "runes": "Quyền Năng Bất Diệt • Tàn Phá Hủy Diệt • Ngọn Gió Thứ Hai • Lan Tràn",
+            "counters": [
+                {"champ": "Gwen", "wr": "54.8%", "reason": "Sát thương theo % máu chuẩn xuyên qua toàn bộ lượng giáp của K'Sante."},
+                {"champ": "Fiora", "wr": "54.2%", "reason": "Phản Đòn (W) chặn W/Q3 của K'Sante, chém điểm yếu sát thương chuẩn."},
+                {"champ": "Poppy", "wr": "53.9%", "reason": "Không Thể Lay Chuyển (W) chặn toàn bộ lướt E và R Khô Máu của K'Sante."}
+            ],
+            "counter_strategy": "Đánh bằng các tướng có sát thương chuẩn hoặc thả diều tầm xa né Q3. Không đứng gần tường để tránh bị R kéo qua."
+        }
+    ],
+    "jungle": [
+        {
+            "name": "Sejuani", "tier": "S+ (VCS / LCK King)", "win_rate": "52.9%", "ban_rate": "38%",
+            "why_hot": "Dọn rừng nhanh, trâu bò và chuỗi khống chế đóng băng kích hoạt tức thì khi đi cùng Solo Laner cận chiến.",
+            "core_build": "Băng Giáp ➔ Giáp Gai ➔ Giáp Tâm Linh / Lời Thề Hiệp Sĩ",
+            "runes": "Dư Chấn • Suối Nguồn Sinh Mệnh • Kiểm Soát Điều Kiện • Tiếp Sức",
+            "counters": [
+                {"champ": "Trundle", "wr": "55.8%", "reason": "Chinh Phục (R) hút sạch giáp/kháng phép biến Sejuani thành bia đỡ đạn giấy."},
+                {"champ": "Olaf", "wr": "54.7%", "reason": "Tận Thế Ragnarok (R) kháng 100% mọi hiệu ứng làm chậm và đóng băng của Sejuani."},
+                {"champ": "Kindred", "wr": "53.5%", "reason": "Cơ động nhảy thả diều cướp rừng và R Cừu Cứu Sinh cứu đồng đội bị đóng băng."}
+            ],
+            "counter_strategy": "Pick tướng xâm lăng cướp rừng đầu game hoặc các đấu sĩ kháng CC càn quét. Tránh giao tranh 2v2 khi Mid đối thủ là tướng cận chiến."
+        },
+        {
+            "name": "Jarvan IV", "tier": "S (Snowball Meta)", "win_rate": "52.4%", "ban_rate": "32%",
+            "why_hot": "Gank sớm phút 2:35 cực gắt, ép Tốc Biến đối thủ và tạo tiền đề ăn sâu hư không / rồng đầu tiên.",
+            "core_build": "Ngọn Giáo Shojin ➔ Nguyệt Đao / Chùy Phản Kích ➔ Móng Vuốt Sterak",
+            "runes": "Chinh Phục • Đắc Thắng • Huyền Thoại: Tốc Độ Đánh • Chốt Chặn Cuối Cùng",
+            "counters": [
+                {"champ": "Poppy", "wr": "56.2%", "reason": "W chặn đứng toàn bộ combo lướt E-Q của Jarvan IV."},
+                {"champ": "Viego", "wr": "53.1%", "reason": "Tay đôi khỏe hơn về giữa trận, cướp xác Jarvan lật ngược combat."},
+                {"champ": "Gragas", "wr": "53.4%", "reason": "Lấy Thịt Đè Người (E) ngắt E-Q của Jarvan, R hất tung phá tan Đại Địa Chấn."}
+            ],
+            "counter_strategy": "Cắm mắt sớm ở phút 1:20 tại bụi sông để phát hiện gank level 2-3. Pick tướng có chiêu thức vượt qua được tường R."
+        }
+    ],
+    "mid": [
+        {
+            "name": "Azir", "tier": "S+ (Pro Priority)", "win_rate": "51.5%", "ban_rate": "45%",
+            "why_hot": "Khả năng dọn lính chống đẩy trụ, an toàn tuyệt đối và chiêu cuối Shurima Shuffle lật kèo giao tranh lớn.",
+            "core_build": "Nanh Nashor ➔ Đồng Hồ Cát Zhonya ➔ Mũ Phù Thủy Rabadon",
+            "runes": "Chinh Phục / Nhịp Độ Chết Người • Hiện Diện Trí Tuệ • Huyền Thoại: Tốc Độ Đánh",
+            "counters": [
+                {"champ": "Syndra", "wr": "54.6%", "reason": "Tầm dùng chiêu xa hơn đè Azir từ cấp 1-5, E ngắt lướt E-Q của Azir."},
+                {"champ": "Jayce", "wr": "53.9%", "reason": "Cầu Sấm dồn sát thương sốc cấu rỉa máu Azir trước khi nổ giao tranh."},
+                {"champ": "Zed", "wr": "53.2%", "reason": "Dấu Ấn Tử Thần (R) né hoàn toàn Phân Chia Thiên Hạ (R) của Azir."}
+            ],
+            "counter_strategy": "Đè đường và ép giao tranh từ phút 1 đến 15 trước khi Azir có món đồ thứ 2. Chọn tướng tầm xa hoặc sát thủ cơ động né lính cát."
+        },
+        {
+            "name": "Yone", "tier": "S+ (Meta Flex)", "win_rate": "52.2%", "ban_rate": "50%",
+            "why_hot": "Khả năng phân chia sát thương AD/AP/True, cơ động cao, đẩy lẻ cánh 1-3-1 và mở giao tranh diện rộng cực mạnh.",
+            "core_build": "Gươm Suy Hao / Móc Diệt ➔ Vô Cực Kiếm ➔ Móng Vuốt Sterak / Khiên Băng",
+            "runes": "Nhịp Độ Chết Người • Đắc Thắng • Huyền Thoại: Tốc Độ Đánh • Chốt Chặn Cuối Cùng",
+            "counters": [
+                {"champ": "Renekton", "wr": "56.1%", "reason": "Choáng W phá khiên W của Yone, dồn sát thương sốc chết Yone trong 1 combo."},
+                {"champ": "Pantheon", "wr": "55.3%", "reason": "W Choáng chỉ định (Point & click) không thể né, E chặn 100% sát thương phản công."},
+                {"champ": "Vex", "wr": "54.2%", "reason": "Nội tại Hoảng Sợ trừng phạt mỗi khi Yone dùng Q3 hoặc E lướt tới."}
+            ],
+            "counter_strategy": "Sử dụng khống chế cứng chỉ định (Targeted Stun) và lên Khiên Băng Randuin + Giày Thép Gai để giảm 30% sát thương bạo kích."
+        }
+    ],
+    "adc": [
+        {
+            "name": "Kalista", "tier": "S+ (Early Dominance)", "win_rate": "53.0%", "ban_rate": "46%",
+            "why_hot": "Vua đè đường cấp 1-3, kiểm soát 100% mục tiêu lớn nhờ E Giày Vò và ulti R setup giao tranh với SP mở.",
+            "core_build": "Gươm Suy Hao ➔ Cuồng Đao Guinsoo ➔ Đao Tím / Nỏ Tử Thủ",
+            "runes": "Mưa Kiếm / Nhịp Độ Chết Người • Vị Máu • Thu Thập Nhãn Cầu",
+            "counters": [
+                {"champ": "Ashe", "wr": "55.7%", "reason": "Băng Tiễn làm chậm làm giảm trực tiếp tốc độ nhảy nội tại của Kalista."},
+                {"champ": "Nasus", "wr": "56.4%", "reason": "Lão Hóa (W) làm giảm 75% tốc chạy & tốc đánh biến Kalista thành bia tập bắn."},
+                {"champ": "Varus", "wr": "53.5%", "reason": "Cấu rỉa tầm xa và R trói chân không cho Kalista nhảy nhót."}
+            ],
+            "counter_strategy": "Sử dụng hiệu ứng Làm Chậm (Slow) hoặc Kiệt Sức. Không tranh chấp trừng phạt mục tiêu 50-50 với Kalista khi cô ta đã cắm nhiều giáo."
+        },
+        {
+            "name": "Varus", "tier": "S (Flexibility King)", "win_rate": "52.1%", "ban_rate": "35%",
+            "why_hot": "Cực kỳ đa dụng: Có thể lên Sát Lực cấu rỉa hoặc On-hit diệt Đỡ Đòn, chiêu cuối R mở/phản giao tranh hoàn hảo.",
+            "core_build": "Gươm Suy Hao ➔ Cuồng Đao Guinsoo ➔ Nỏ Thiện Xạ / Đồng Hồ Cát",
+            "runes": "Nhịp Độ Chết Người • Đắc Thắng • Huyền Thoại: Tốc Độ Đánh • Nhát Chém Ân Huệ",
+            "counters": [
+                {"champ": "Braum", "wr": "54.9%", "reason": "Khiên E Tối Kiên Cường chặn đứng toàn bộ Q cấu rỉa và chiêu cuối R của Varus."},
+                {"champ": "Samira", "wr": "54.2%", "reason": "Lốc Kiếm (W) chém tan toàn bộ mũi tên và sợi xích tội lỗi của Varus."},
+                {"champ": "Yasuo", "wr": "53.8%", "reason": "Tường Gió vô hiệu hóa hoàn toàn Varus trong giao tranh tổng."}
+            ],
+            "counter_strategy": "Pick các tướng có khiên chặn đạn đạo (Braum, Samira, Yasuo) hoặc đấu sĩ lao thẳng vào áp sát nhanh."
+        }
+    ],
+    "support": [
+        {
+            "name": "Nautilus", "tier": "S+ (Engage King)", "win_rate": "52.8%", "ban_rate": "40%",
+            "why_hot": "Lượng khống chế cứng khổng lồ: Q kéo, Nội tại trói chân, R Thủy Lôi Tầm Nhiệt chỉ định không thể né.",
+            "core_build": "Dây Chuyền Solari ➔ Lời Thề Hiệp Sĩ ➔ Giáp Gai",
+            "runes": "Dư Chấn • Nện Khiên • Kiểm Soát Điều Kiện • Lan Tràn",
+            "counters": [
+                {"champ": "Morgana", "wr": "56.3%", "reason": "Khiên Đen (E) vô hiệu hóa hoàn toàn kéo Q và ulti R của Nautilus."},
+                {"champ": "Braum", "wr": "54.1%", "reason": "Nhảy lên chắn kéo cho xạ thủ, phản công bằng nội tại làm choáng."},
+                {"champ": "Renata Glasc", "wr": "53.6%", "reason": "Cứu nguy Xạ Thủ bằng W và dùng R biến sát thương team địch đánh lẫn nhau khi Nautilus mở vào."}
+            ],
+            "counter_strategy": "Pick Morgana hoặc lên Khăn Giải Thuật / Dây Chuyền Chữ Thập. Giữ vị trí sau lính để tránh bị Q kéo bất ngờ."
+        },
+        {
+            "name": "Renata Glasc", "tier": "S (Counter-Engage Queen)", "win_rate": "52.5%", "ban_rate": "36%",
+            "why_hot": "Khắc chế cứng mọi đội hình lao vào và tốc đánh cao. W Cứu Nguy tạo cơ hội lật kèo ngoạn mục.",
+            "core_build": "Dây Chuyền Solari ➔ Dây Chuyền Chuộc Tội ➔ Vương Miện Shurelya",
+            "runes": "Hộ Vệ • Nện Khiên • Giáp Cốt • Tiếp Sức",
+            "counters": [
+                {"champ": "Milio", "wr": "55.8%", "reason": "Chiêu cuối R Khúc Ca Hoàn Sinh giải trừ toàn bộ hiệu ứng Cuồng Bạo từ ulti của Renata."},
+                {"champ": "Soraka", "wr": "54.2%", "reason": "Câm lặng E đặt dưới chân ngắt combo của Renata, hồi máu diện rộng."},
+                {"champ": "Karma", "wr": "53.7%", "reason": "Cấu rỉa tầm xa và bật khiên tốc chạy E né hoàn toàn làn sóng R của Renata."}
+            ],
+            "counter_strategy": "Pick Milio để giải chiêu cuối R của Renata. Không dồn đội hình tụ lại một cụm khi giao tranh ở cửa hang rồng/baron."
+        }
+    ]
+}
+

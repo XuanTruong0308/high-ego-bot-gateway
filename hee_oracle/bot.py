@@ -486,6 +486,141 @@ async def cmd_scrim_history(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed)
 
 
+# ─────────────────────────── LỆNH 7: POWER PICKS & COUNTER THEO PATCH ───────────────────────────
+
+@oracle_group.command(name='power-picks', description='[Road to VCS] Phân tích Power Picks theo Patch, Build đồ & Kèo khắc chế (OP.GG / DeepLoL)')
+@app_commands.describe(lane='Chọn khu vực đường muốn phân tích (hoặc Tất cả)')
+@app_commands.choices(lane=[
+    app_commands.Choice(name='🌐 Tất cả các đường (Toàn diện Meta)', value='all'),
+    app_commands.Choice(name='🛡️ Đường Trên (Top Lane)', value='top'),
+    app_commands.Choice(name='🌲 Đi Rừng (Jungle)', value='jungle'),
+    app_commands.Choice(name='⚡ Đường Giữa (Mid Lane)', value='mid'),
+    app_commands.Choice(name='🏹 Xạ Thủ (ADC / Bot)', value='adc'),
+    app_commands.Choice(name='🛡️ Hỗ Trợ (Support)', value='support')
+])
+async def cmd_power_picks(interaction: discord.Interaction, lane: app_commands.Choice[str]):
+    await interaction.response.defer()
+
+    lanes_to_show = ["top", "jungle", "mid", "adc", "support"] if lane.value == 'all' else [lane.value]
+
+    embed = discord.Embed(
+        title=f'🔥 BÁO CÁO POWER PICKS & KHẮC CHẾ — HIGH-ELO META (OP.GG & DEEPLOL)',
+        description=(
+            f'Tổng hợp các quân bài thống trị sau các đợt update cân bằng (Buff/Nerf):\n'
+            f'📊 *Dữ liệu tổng hợp từ phân khúc Master+, Thách Đấu và đấu trường LCK/VCS.*'
+        ),
+        color=COLOR_RED,
+        timestamp=datetime.now()
+    )
+
+    lane_labels = {
+        "top": "🛡️ ĐƯỜNG TRÊN (TOP)",
+        "jungle": "🌲 ĐI RỪNG (JUNGLE)",
+        "mid": "⚡ ĐƯỜNG GIỮA (MID)",
+        "adc": "🏹 XẠ THỦ (ADC)",
+        "support": "🛡️ HỖ TRỢ (SUPPORT)"
+    }
+
+    for l_key in lanes_to_show:
+        picks = odata.POWER_PICKS.get(l_key, [])
+        for p in picks:
+            counter_lines = []
+            for c in p["counters"]:
+                counter_lines.append(f"  • **{c['champ']}** ({c['wr']} WR vs {p['name']}): {c['reason']}")
+            
+            counter_str = "\n".join(counter_lines)
+            field_val = (
+                f'🔥 **Vị thế:** `{p["tier"]}` | WR: **{p["win_rate"]}** | Ban Rate: **{p["ban_rate"]}**\n'
+                f'💡 **Lý do mạnh:** {p["why_hot"]}\n'
+                f'📦 **Core Build:** `{p["core_build"]}`\n'
+                f'🌿 **Ngọc:** {p["runes"]}\n\n'
+                f'⚔️ **Top Tướng Khắc Chế Cứng (Data OP.GG):**\n{counter_str}\n'
+                f'🛡️ **Chiến thuật bẻ gãy:** {p["counter_strategy"]}\n'
+                f'🔗 [OP.GG Counters](https://www.op.gg/champions/{p["name"].lower().replace("\'", "")}/counters/{l_key}) • [DeepLoL Pro Tracker](https://www.deeplol.gg/champions/{p["name"].lower().replace("\'", "")}/build)'
+            )
+            embed.add_field(name=f'{lane_labels[l_key]} — {p["name"].upper()}', value=field_val, inline=False)
+
+    embed.set_footer(text='High Ego eSport • Ban Phân Tích & Chiến Lược Thi Đấu')
+    await interaction.followup.send(embed=embed)
+
+
+# ─────────────────────────── LỆNH 8: BẢN ĐỒ CHIẾN THUẬT CẮM MẮT (SUPPORT MACRO) ───────────────────────────
+
+@oracle_group.command(name='vision', description='[Support Macro] Bản đồ cắm mắt & sơ đồ chiến thuật kiểm soát vị trí mục tiêu')
+@app_commands.describe(muc_tieu='Chọn mục tiêu chiến thuật cần thiết lập mạng lưới tầm nhìn')
+@app_commands.choices(muc_tieu=[
+    app_commands.Choice(name='👾 Sâu Hư Không (Voidgrubs 5:00) — Đảo đường cánh trên', value='voidgrubs'),
+    app_commands.Choice(name='🐉 Hang Rồng (Dragon 1 & 2) — Kiểm soát tam giác tầm nhìn', value='early_dragon'),
+    app_commands.Choice(name='👑 Hang Baron (Baron 20:00+) — Mạng lưới tầm nhìn từ gần ra xa', value='baron_setup'),
+    app_commands.Choice(name='🛡️ Chống Băng Trụ Bot (Anti-Dive) — Mắt báo động bọc sau', value='anti_dive_bot')
+])
+async def cmd_vision(interaction: discord.Interaction, muc_tieu: app_commands.Choice[str]):
+    tactic = odata.VISION_TACTICS.get(muc_tieu.value)
+    if not tactic:
+        await interaction.response.send_message('❌ Không tìm thấy thông tin mục tiêu!', ephemeral=True)
+        return
+
+    embed = discord.Embed(
+        title=tactic["title"],
+        description=f'**Thời điểm chuẩn bị:** `{tactic["timing"]}`',
+        color=COLOR_CYAN,
+        timestamp=datetime.now()
+    )
+
+    embed.add_field(name='🚶 Tuyến Đường Di Chuyển Của Hỗ Trợ (Rotation)', value=tactic["support_rotation"], inline=False)
+
+    ward_text = "\n".join([f"• {w}" for w in tactic["ward_spots"]])
+    embed.add_field(name='📍 Tọa Độ Cắm Mắt Then Chốt', value=ward_text, inline=False)
+
+    embed.add_field(name='🧹 Nguyên Tắc Phá Tầm Nhìn Đối Phương', value=tactic["deward_tip"], inline=False)
+    embed.add_field(name='🗺️ Sơ Đồ Chiến Thuật Vị Trí Mắt', value=tactic["ascii_map"], inline=False)
+
+    embed.set_footer(text='High Ego eSport • Cẩm Nang Hỗ Trợ Kiểm Soát Tầm Nhìn')
+    await interaction.response.send_message(embed=embed)
+
+
+# ─────────────────────────── LỆNH 9: VÒNG RỪNG & ĐỘT BIẾN PRO LCK/VCS ───────────────────────────
+
+@oracle_group.command(name='jungle', description='[Jungle Macro] Vòng rừng chuẩn LCK, mốc đột biến & thời điểm can thiệp gank/dive')
+@app_commands.describe(tuong_rung='Chọn vị tướng rừng Pro Meta muốn tra cứu chiến thuật')
+@app_commands.choices(tuong_rung=[
+    app_commands.Choice(name='Sejuani — Đỡ đòn mở giao tranh & ép sâu hư không', value='sejuani'),
+    app_commands.Choice(name='Jarvan IV — Gank sớm phút 2:35 & Womb-combo', value='jarvan_iv'),
+    app_commands.Choice(name='Vi — Khóa chết chủ lực chỉ định (Point-and-Click)', value='vi'),
+    app_commands.Choice(name='Maokai — Chồi non kiểm soát bản đồ toàn diện', value='maokai'),
+    app_commands.Choice(name='Xin Zhao — Đấu sĩ tay đôi mạnh & Bán Nguyệt Thương', value='xin_zhao'),
+    app_commands.Choice(name='Nidalee — Sát thủ xâm lăng rừng snowball tốc độ cao', value='nidalee'),
+    app_commands.Choice(name='Nocturne — Tắt đèn toàn cầu bắt lẻ đối thủ', value='nocturne')
+])
+async def cmd_jungle(interaction: discord.Interaction, tuong_rung: app_commands.Choice[str]):
+    clean_key = tuong_rung.value.replace("_", " ")
+    data = None
+    for k, v in odata.JUNGLE_META.items():
+        if k == clean_key or k.replace(" ", "_") == tuong_rung.value:
+            data = v
+            break
+
+    if not data:
+        await interaction.response.send_message('❌ Không tìm thấy dữ liệu cho tướng rừng này!', ephemeral=True)
+        return
+
+    embed = discord.Embed(
+        title=f'🌲 CẨM NANG RỪNG PRO LCK/VCS: {data["name"].upper()} ({data["tier"]})',
+        description=f'**Đặc tính chiến thuật:** `{data["archetype"]}`',
+        color=COLOR_EMERALD,
+        timestamp=datetime.now()
+    )
+
+    embed.add_field(name='🔄 Vòng Rừng Tiêu Chuẩn (Full Clear 3:15)', value=f'👉 {data["primary_path"]}', inline=False)
+    embed.add_field(name='⚡ Vòng Rừng Gank Sớm / Đảo Đường', value=f'👉 {data["fast_path"]}', inline=False)
+    embed.add_field(name='💥 Mốc Đột Biến Sức Mạnh (Power Spikes)', value=data["spike_levels"], inline=False)
+    embed.add_field(name='🏰 Tiềm Năng Băng Trụ (Dive Potential)', value=data["dive_potential"], inline=False)
+    embed.add_field(name='🧠 Chiến Thuật LCK & Mẹo Vận Hành', value=data["lck_pro_tactics"], inline=False)
+
+    embed.set_footer(text='High Ego eSport • Ban Huấn Luyện Rừng Road To VCS')
+    await interaction.response.send_message(embed=embed)
+
+
 bot.tree.add_command(oracle_group)
 
 if __name__ == '__main__':
