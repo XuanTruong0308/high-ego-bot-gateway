@@ -1,57 +1,51 @@
 """
 filter_engine.py — Bộ lọc từ ngữ thô tục / xúc phạm cực đoan cho HEe Sentinel.
-Được tối ưu để triệt tiêu False-Positive (không bao giờ phạt nhầm các từ tiếng Việt thông dụng như: các, khác, bác, chắc, dám, bụi...).
+Chỉ giới hạn nghiêm ngặt ở các từ ngữ xúc phạm nặng theo yêu cầu:
+- địt mẹ, địt mẹ mày
+- đụ má, đụ má mày
+- lồn
+- cặc
+Cho phép hoàn toàn các từ viết tắt / cảm thán thông thường như: vl, dcm, dcmm, dmm, dm, vcl, vcc, vc...
+Đảm bảo 100% không bao giờ phạt nhầm từ tiếng Việt như: các, khác, bác, chắc, dám, bụi, lộn xộn...
 """
 
 import re
-import unicodedata
 
-# Danh sách từ tiếng Việt an toàn TUYỆT ĐỐI không bao giờ bị coi là vi phạm (Whitelist)
+# Danh sách từ an toàn tuyệt đối (Whitelist)
 SAFE_WORDS = {
     "các", "khác", "bác", "chắc", "thắc", "mắc", "thắc mắc", "rác", "lạc", "vác", "hạc",
     "tác", "xác", "nhạc", "phác", "thác", "mác", "khắc", "nấc", "giác",
     "bùi", "bụi", "ngậm ngùi", "bùi ngùi", "dám", "can đảm", "đàm", "hội đàm",
-    "lộn", "lộn xộn", "nhầm lộn", "nhầm lẫn", "con lợn", "lợn", "lái buôn",
-    "buôn", "buộc", "buồng", "cúc", "cục", "cóc", "cọc", "cộc", "cực"
+    "lộn", "lộn xộn", "nhầm lộn", "nhầm lẫn", "con lợn", "lợn",
+    "cúc", "cục", "cóc", "cọc", "cộc", "cực", "cac ban", "cac"
 }
 
-# Danh sách Regex từ cấm chính xác (bắt buộc đúng ngữ cảnh ranh giới từ)
-STRICT_BANNED_PATTERNS = [
-    # Nhóm "cặc / cac" (TUYỆT ĐỐI không chứa ký tự 'á', 'à', 'ả', 'ã' để tránh dính từ "các")
-    r"\b(?:cặ[ck]|kặ[ck]|c[aă]k|k[aă]k)\b",
-    r"\b(?:c[aă]c|kac)\b",
+# CHỈ BẮT ĐÚNG CÁC TỪ THÔ TỤC CỰC ĐOAN CHỈ ĐỊNH:
+TARGET_BANNED_PATTERNS = [
+    # 1. Nhóm "địt mẹ", "địt mẹ mày"
+    r"\b(?:đ[iị]t|d[iị]t|đjt|djt)\s*m[ẹe](?:\s*m[aày])?\b",
 
-    # Nhóm "buồi / buoi" (Không dính "bùi", "bụi")
-    r"\b(?:bu[ồò]i|buoi|b[uồò]y)\b",
+    # 2. Nhóm "đụ má", "đụ má mày"
+    r"\b(?:đ[ụu]|d[ụu])\s*m[áa](?:\s*m[aày])?\b",
 
-    # Nhóm "lồn / lon" (Không dính "lợn", "lộn xộn")
-    r"\b(?:l[ồòõ]n|l0n|l[o0]z|l[o0]zz)\b",
+    # 3. Nhóm "lồn" (Không bắt "lộn", "lộn xộn", "lợn")
+    r"\b(?:l[ồòõ]n|l0n)\b",
 
-    # Nhóm "dâm" thô tục
-    r"\b(?:d[aâ]m\s*(?:tặc|dục|dê|loàn|đãng))\b",
-
-    # Nhóm chửi thề / bộ phận sinh dục
-    r"\b(?:đ[iị]t|d[iị]t|đjt|djt)\b",
-    r"\b(?:đ[ụu]|d[ụu])\s*(?:m[ẹe]|má|ma|c[ặa]c|cac|bà|cha|con)\b",
-    r"\b(?:đ[iị]t|d[iị]t)\s*(?:m[ẹe]|c[oụùú]|b[aà]|cha)\b",
-    r"\b(?:m[ẹe]\s*m[aày]|b[aà]\s*m[aày])\b",
-
-    # Nhóm viết tắt tục tĩu phổ biến
-    r"\b(?:dcm|dmm|vcl|clmm|ccmnr|đmm|đcm|đclm|vkl)\b",
+    # 4. Nhóm "cặc" (Bắt buộc phải có chữ 'ặ' để tuyệt đối không bao giờ dính chữ "các" hoặc "cac")
+    r"\b(?:cặ[ck]|kặ[ck])\b",
 ]
 
 
 def clean_leetspeak(text: str) -> str:
-    """Loại bỏ ký tự đặc biệt lách luật nằm giữa các chữ cái: c.ặ.c -> cặc, l_ồ_n -> lồn"""
+    """Loại bỏ ký tự đặc biệt lách luật chèn giữa chữ cái: c.ặ.c -> cặc, l_ồ_n -> lồn"""
     if not text:
         return ""
-    # Thay thế các ký tự lách luật nhưng giữ khoảng trắng
     return re.sub(r"[\.\,\-\_\*\~\`\!\@\#\$\%\^\&\(\)\+\=\\\/\|]", "", text)
 
 
 class ProfanityFilter:
     def __init__(self, custom_words: list[str] | None = None):
-        patterns = STRICT_BANNED_PATTERNS.copy()
+        patterns = TARGET_BANNED_PATTERNS.copy()
         if custom_words:
             for w in custom_words:
                 cleaned_w = re.escape(w.strip().lower())
@@ -63,10 +57,8 @@ class ProfanityFilter:
 
     def check(self, content: str) -> tuple[bool, str | None]:
         """
-        Kiểm tra vi phạm:
-        - Kiểm tra trực tiếp trên chuỗi thô.
-        - Kiểm tra trên chuỗi đã giải mã leetspeak (c.ặ.c).
-        - Đảm bảo các từ an toàn trong SAFE_WORDS không bao giờ kích hoạt phạt.
+        Kiểm tra xem nội dung có chứa các từ thô tục bị cấm hay không.
+        Trả về: (Có vi phạm hay không, Từ vi phạm phát hiện)
         """
         if not content:
             return False, None
@@ -77,11 +69,10 @@ class ProfanityFilter:
         match = self.regex.search(lower_content)
         if match:
             matched_word = match.group(0).strip()
-            # Bỏ qua nếu từ match nằm trong whitelist an toàn
             if matched_word not in SAFE_WORDS:
                 return True, matched_word
 
-        # 2. Kiểm tra chuỗi sau khi lọc ký tự lách luật
+        # 2. Kiểm tra chuỗi đã khử leetspeak (ví dụ: đ.ị.t m.ẹ, c.ặ.c)
         cleaned_content = clean_leetspeak(lower_content)
         if cleaned_content != lower_content:
             match_cleaned = self.regex.search(cleaned_content)
