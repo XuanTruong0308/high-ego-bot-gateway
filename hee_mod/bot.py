@@ -71,8 +71,10 @@ class SentinelBot(commands.Bot):
         guild = discord.Object(id=GUILD_ID)
         self.tree.copy_global_to(guild=guild)
         try:
-            synced = await self.tree.sync(guild=guild)
-            logger.info(f'Synced {len(synced)} slash command(s) vào guild {GUILD_ID}.')
+            synced_guild = await self.tree.sync(guild=guild)
+            logger.info(f'Synced {len(synced_guild)} slash command(s) vào guild {GUILD_ID}.')
+            synced_global = await self.tree.sync()
+            logger.info(f'Synced {len(synced_global)} global slash command(s).')
         except discord.Forbidden:
             logger.warning(f'Không thể sync guild {GUILD_ID} (403). Chuyển sang global sync...')
             synced = await self.tree.sync()
@@ -282,6 +284,63 @@ async def cmd_clear_logs(interaction: discord.Interaction):
         await interaction.response.send_message('🧹 Đã dọn dẹp sạch toàn bộ file logs lỗi!', ephemeral=True)
     else:
         await interaction.response.send_message('❌ Không thể dọn dẹp file logs.', ephemeral=True)
+
+@bot.tree.command(name='strike-reset', description='[Role HE / Admin] Reset số lần vi phạm ngôn từ của thành viên về 0')
+@app_commands.describe(
+    thanh_vien='Thành viên muốn xóa số lần vi phạm',
+    ly_do='Lý do xóa vi phạm (mặc định: Đã kiểm điểm / BQT Ân xá)'
+)
+async def cmd_strike_reset(
+    interaction: discord.Interaction,
+    thanh_vien: discord.Member,
+    ly_do: str = "Đã kiểm điểm / BQT Ân xá"
+):
+    member = interaction.user
+    if not isinstance(member, discord.Member) or not has_he_role(member):
+        await interaction.response.send_message('❌ Bạn phải có role **HE** hoặc **Admin** mới được dùng lệnh này!', ephemeral=True)
+        return
+
+    if not economy_db:
+        await interaction.response.send_message('❌ Không tìm thấy database kinh tế `economy_db`!', ephemeral=True)
+        return
+
+    try:
+        economy_db.reset_user_account(
+            user_id=thanh_vien.id,
+            guild_id=interaction.guild_id,
+            reset_points=False,
+            reset_strikes=True,
+            reason=ly_do,
+            operator_id=member.id
+        )
+
+        embed = discord.Embed(
+            title='🕊️ ÂN XÁ / RESET VI PHẠM THÀNH CÔNG',
+            description=(
+                f'Toàn bộ số lần cảnh cáo & vi phạm của {thanh_vien.mention} đã được đưa về **0 lần**!\n\n'
+                f'👤 **Thành viên:** {thanh_vien.mention} (`{thanh_vien.id}`)\n'
+                f'👑 **Người thực hiện:** {member.mention}\n'
+                f'📝 **Lý do:** {ly_do}\n'
+                f'💡 *Thành viên này hiện đã có lịch sử trong sạch để tiếp tục sinh hoạt.*'
+            ),
+            color=0x10B981,
+            timestamp=datetime.now()
+        )
+        embed.set_footer(text='HEe • Sentinel AutoMod & Justice System')
+        await interaction.response.send_message(embed=embed)
+
+        # Gửi log mod
+        if LOG_CHANNEL_ID:
+            log_chan = interaction.guild.get_channel(LOG_CHANNEL_ID)
+            if log_chan:
+                try:
+                    await log_chan.send(embed=embed)
+                except Exception:
+                    pass
+
+    except Exception as e:
+        logger.error(f"Lỗi khi reset strike cho {thanh_vien.id}: {e}")
+        await interaction.response.send_message(f'❌ Đã có lỗi xảy ra khi reset vi phạm: {e}', ephemeral=True)
 
 # ─────────────────────────── Khởi động ───────────────────────────────────
 if __name__ == '__main__':

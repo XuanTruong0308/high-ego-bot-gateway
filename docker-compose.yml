@@ -101,3 +101,14 @@ services:
       - ./hee_arena:/app
       - ./hee_arena/data:/app/data
 
+  oracle:
+    build:
+      context: ./hee_oracle
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./hee_oracle/.env
+    volumes:
+      - ./hee_oracle:/app
+      - ./hee_oracle/data:/app/data
+

@@ -85,8 +85,10 @@ class ArenaBot(commands.Bot):
         guild = discord.Object(id=GUILD_ID)
         self.tree.copy_global_to(guild=guild)
         try:
-            synced = await self.tree.sync(guild=guild)
-            logger.info(f'Synced {len(synced)} slash command(s) vào guild {GUILD_ID}.')
+            synced_guild = await self.tree.sync(guild=guild)
+            logger.info(f'Synced {len(synced_guild)} slash command(s) vào guild {GUILD_ID}.')
+            synced_global = await self.tree.sync()
+            logger.info(f'Synced {len(synced_global)} global slash command(s) (cập nhật mới nhất không còn banner_url).')
         except discord.Forbidden:
             logger.warning(f'Không thể sync guild {GUILD_ID} (403). Fallback sang global sync...')
             synced = await self.tree.sync()
