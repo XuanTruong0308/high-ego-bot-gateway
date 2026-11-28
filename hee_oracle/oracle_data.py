@@ -62,7 +62,58 @@ CHAMPIONS = {
         "vcs_tips": "Cực kỳ giá trị trong thế trận 1-3-1 kéo dài. Người chơi cần kiểm soát bình nộ ở mức 80-90% trước khi dịch chuyển giao tranh hang Baron."
     },
 
+    "sett": {
+        "name": "Sett", "lane": "top", "type": "Đấu sĩ càn lướt & Phản đòn sát thương chuẩn",
+        "dmg_ad": 85, "dmg_ap": 0, "dmg_true": 15, "cc_level": 4, "engage": 4, "early": 5, "mid": 4, "late": 3,
+        "counters": ["Renekton", "Jax", "K'Sante", "Aatrox"],
+        "beaten_by": "Vayne, Quinn, Fiora (thả diều và chém % máu chuẩn né W Cuồng Thú), Renekton W phá khiên.",
+        "synergies": ["Sejuani", "Jarvan IV", "Orianna", "Lulu", "Rakan"],
+        "core_items": ["Chùy Phản Kích (Stridebreaker)", "Móng Vuốt Sterak", "Rìu Đại Mãng Xà / Tim Băng"],
+        "situational_items": ["Giáp Gai", "Giáp Tâm Linh", "Giáp Liệt Sĩ", "Chùy Gai Malmortius"],
+        "vcs_tips": "Đè đường cấp 1-2 với E + Đấm đôi nội tại. Trong combat, dùng R Hủy Diệt Đấu Trường ôm Tanker đối phương ném thẳng vào tuyến sau của địch, sau đó tích đầy Nộ bấm W dồn sát thương chuẩn sốc chết Xạ thủ / Pháp sư đối phương."
+    },
+    "jax": {
+        "name": "Jax", "lane": "top", "type": "Đấu sĩ đẩy lẻ & Đấu tay đôi vô địch Late Game",
+        "dmg_ad": 65, "dmg_ap": 35, "dmg_true": 0, "cc_level": 3, "engage": 3, "early": 3, "mid": 4, "late": 5,
+        "counters": ["Camille", "Fiora", "Irelia", "K'Sante"],
+        "beaten_by": "Gragas, Poppy, Malphite (chặn lướt Q và làm chậm tốc độ đánh).",
+        "synergies": ["Sejuani", "Vi", "Orianna", "Ahri"],
+        "core_items": ["Tam Hợp Kiếm", "Ngọn Giáo Shojin / Rìu Đen", "Móng Vuốt Sterak"],
+        "situational_items": ["Tim Băng", "Đồng Hồ Cát Zhonya", "Giáp Tâm Linh"],
+        "vcs_tips": "Vua đẩy lẻ cánh 1-3-1. Phản Công (E) né toàn bộ đòn đánh tay của Xạ thủ, R gia tăng giáp/kháng phép khổng lồ khi lao vào giữa đội hình đối phương."
+    },
+    "darius": {
+        "name": "Darius", "lane": "top", "type": "Đấu sĩ càn quét & Máy chém sát thương chuẩn",
+        "dmg_ad": 85, "dmg_ap": 0, "dmg_true": 15, "cc_level": 3, "engage": 2, "early": 5, "mid": 4, "late": 3,
+        "counters": ["Sion", "Cho'Gath", "Shen", "Malphite"],
+        "beaten_by": "Quinn, Vayne, Jayce (thả diều tầm xa không cho tích 5 điểm Xuất Huyết).",
+        "synergies": ["Tốc Hành", "Jarvan IV", "Nautilus", "Lulu"],
+        "core_items": ["Chùy Phản Kích", "Móng Vuốt Sterak", "Giáp Liệt Sĩ"],
+        "situational_items": ["Giáp Gai", "Khiên Băng Randuin", "Chùy Gai Malmortius"],
+        "vcs_tips": "Bật Tốc Hành ngay khi đối phương vượt nửa đường để dí tới cùng. Trong giao tranh, tích 5 tầng nội tại lên tướng đỡ đòn tuyến đầu trước, sau đó Tốc Biến R chém reset liên hoàn tuyến sau."
+    },
+
     # ─── JUNGLE ───
+    "lee sin": {
+        "name": "Lee Sin", "lane": "jungle", "type": "Đấu sĩ kiểm soát đầu game & Mở combat Insec",
+        "dmg_ad": 95, "dmg_ap": 5, "dmg_true": 0, "cc_level": 3, "engage": 5, "early": 5, "mid": 4, "late": 2,
+        "counters": ["Nidalee", "Karthus", "Viego", "Kayn"],
+        "beaten_by": "Poppy (W chặn lướt Q2/W), Rammus, Trundle (tay đôi khỏe hơn khi về mid game).",
+        "synergies": ["Yasuo", "Orianna", "Ahri", "Renekton"],
+        "core_items": ["Nguyệt Đao / Chùy Mãng Xà", "Rìu Đen", "Móng Vuốt Sterak"],
+        "situational_items": ["Giáp Thiên Thần", "Chùy Gai Malmortius", "Vũ Điệu Tử Thần"],
+        "vcs_tips": "Tạo sức ép gank cực sớm phút 2:40 - 3:00. Combo Q1 -> Cắm Mắt W ra sau lưng -> R Nộ Long Cước sút chủ lực đối phương về cho team dứt điểm."
+    },
+    "viego": {
+        "name": "Viego", "lane": "jungle", "type": "Sát thủ chiếm xác & Lật kèo giao tranh liên hoàn",
+        "dmg_ad": 90, "dmg_ap": 5, "dmg_true": 5, "cc_level": 2, "engage": 3, "early": 3, "mid": 5, "late": 4,
+        "counters": ["Jarvan IV", "Graves", "Lee Sin", "Sejuani"],
+        "beaten_by": "Khống chế cứng sốc chết trước khi kịp kích hoạt nội tại đoạt mệnh chiếm xác.",
+        "synergies": ["Nautilus", "Renekton", "Ahri", "Rakan"],
+        "core_items": ["Gươm Suy Hao", "Tam Hợp Kiếm / Móc Diệt", "Móng Vuốt Sterak"],
+        "situational_items": ["Vũ Điệu Tử Thần", "Chùy Gai Malmortius", "Giáp Thiên Thần"],
+        "vcs_tips": "Chờ đồng đội tạo mạng hạ gục đầu tiên, lướt vào chiếm xác lấy miễn nhiễm sát thương và reset chiêu cuối Tuyệt Mệnh (R) để quét sạch combat."
+    },
     "sejuani": {
         "name": "Sejuani", "lane": "jungle", "type": "Đỡ đòn mở giao tranh",
         "dmg_ad": 10, "dmg_ap": 90, "dmg_true": 0, "cc_level": 5, "engage": 4, "early": 3, "mid": 5, "late": 4,
@@ -115,6 +166,26 @@ CHAMPIONS = {
     },
 
     # ─── MID LANE ───
+    "yasuo": {
+        "name": "Yasuo", "lane": "mid", "type": "Đấu sĩ cơ động & Tường gió khắc chế xạ thủ",
+        "dmg_ad": 95, "dmg_ap": 5, "dmg_true": 0, "cc_level": 3, "engage": 4, "early": 3, "mid": 4, "late": 5,
+        "counters": ["Syndra", "Twisted Fate", "Ahri", "Varus"],
+        "beaten_by": "Renekton, Pantheon, Malzahar (CC chỉ định cứng khóa chết lướt).",
+        "synergies": ["Gragas", "Diana", "Malphite", "Lee Sin", "Nautilus"],
+        "core_items": ["Gươm Suy Hao / Móc Diệt Thủy Quái", "Vô Cực Kiếm", "Móng Vuốt Sterak"],
+        "situational_items": ["Nỏ Tử Thủ", "Vũ Điệu Tử Thần", "Giáp Thiên Thần"],
+        "vcs_tips": "Tường Gió (W) chặn hoàn toàn đạn đạo của Xạ thủ đối phương. Phối hợp combo hất tung cùng Rừng (Gragas E-R, Lee Sin R, Diana R) kích hoạt Trăn Trối quét sạch đội hình."
+    },
+    "sylas": {
+        "name": "Sylas", "lane": "mid", "type": "Pháp sư cận chiến cướp chiêu cuối & Lật kèo giao tranh",
+        "dmg_ad": 5, "dmg_ap": 95, "dmg_true": 0, "cc_level": 3, "engage": 4, "early": 3, "mid": 5, "late": 4,
+        "counters": ["Malphite", "Sejuani", "Ashe", "Nautilus"],
+        "beaten_by": "Cassiopeia, Vex, Galio (chống lao vào và cản lướt E).",
+        "synergies": ["Sejuani", "Jarvan IV", "Maokai", "Lee Sin"],
+        "core_items": ["Đai Lưng Hextech / Ngọn Lửa Hắc Hóa", "Đồng Hồ Cát Zhonya", "Mũ Phù Thủy Rabadon"],
+        "situational_items": ["Mặt Nạ Liandry", "Kính Nhắm Ma Pháp", "Trượng Hư Vô"],
+        "vcs_tips": "Quân bài khắc chế cướp chiêu cuối giá trị cao (R Malphite, R Sejuani, R Alistar, R Ashe). Lướt E2 căn trúng để hồi máu W lật kèo khi còn dưới 30% máu."
+    },
     "azir": {
         "name": "Azir", "lane": "mid", "type": "Pháp sư kiểm soát Late Game",
         "dmg_ad": 5, "dmg_ap": 95, "dmg_true": 0, "cc_level": 3, "engage": 3, "early": 2, "mid": 4, "late": 5,
