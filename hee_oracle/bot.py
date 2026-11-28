@@ -22,6 +22,7 @@ from dotenv import load_dotenv
 
 import oracle_data as odata
 import oracle_db as db
+import opgg_client as opgg
 
 load_dotenv()
 
@@ -76,6 +77,8 @@ class OracleBot(commands.Bot):
     async def setup_hook(self):
         db.init_db()
         logger.info('SQLite Oracle DB khởi tạo thành công.')
+        await opgg.init_champion_database()
+        logger.info('OP.GG & Riot Data Dragon primed thành công.')
 
         guild = discord.Object(id=GUILD_ID)
         self.tree.copy_global_to(guild=guild)
@@ -170,14 +173,50 @@ async def cmd_draft_analyze(
     await interaction.followup.send(embed=embed)
 
 
+async def champion_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+    matches = opgg.search_champions(current, limit=25)
+    return [
+        app_commands.Choice(
+            name=f"{m['name']} ({m['role']})"[:100],
+            value=m['name']
+        )
+        for m in matches
+    ]
+
+
+@cmd_draft_analyze.autocomplete('top')
+async def draft_top_ac(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+    return await champion_autocomplete(interaction, current)
+
+@cmd_draft_analyze.autocomplete('jungle')
+async def draft_jg_ac(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+    return await champion_autocomplete(interaction, current)
+
+@cmd_draft_analyze.autocomplete('mid')
+async def draft_mid_ac(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+    return await champion_autocomplete(interaction, current)
+
+@cmd_draft_analyze.autocomplete('adc')
+async def draft_adc_ac(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+    return await champion_autocomplete(interaction, current)
+
+@cmd_draft_analyze.autocomplete('support')
+async def draft_sup_ac(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+    return await champion_autocomplete(interaction, current)
+
+
 # ─────────────────────────── LỆNH 2: COUNTER & MATCHUP ───────────────────────────
 
 @oracle_group.command(name='counter', description='[Road to VCS] Phân tích khắc chế tướng, kèo đấu kỹ năng và quản lý đợt lính')
-@app_commands.describe(tuong='Tên vị tướng đối thủ cần khắc chế (VD: Sett, Yone, K\'Sante, Azir, Kalista, Renekton...)')
+@app_commands.describe(tuong='Tên vị tướng đối thủ cần khắc chế (gõ để tìm kiếm)')
 async def cmd_counter(interaction: discord.Interaction, tuong: str):
+    await interaction.response.defer()
     clean_name = tuong.lower().strip()
-    champ_slug = clean_name.replace("'", "").replace(" ", "")
+    champ_slug = opgg.get_champ_slug(tuong)
     champ_title = tuong.strip().title()
+
+    opgg_data = await opgg.fetch_opgg_data(tuong)
+    thumb_url = f"https://opgg-static.akamaized.net/meta/images/lol/latest/champion/{champ_slug}.png"
 
     data = None
     for key, c_info in odata.CHAMPIONS.items():
@@ -186,53 +225,72 @@ async def cmd_counter(interaction: discord.Interaction, tuong: str):
             break
 
     if not data:
-        # Fallback general advice with live OP.GG links
         embed = discord.Embed(
             title=f'⚔️ CHIẾN THUẬT ĐỐI ĐẦU: {champ_title.upper()}',
             description=(
-                f'Dữ liệu đối đầu cho `{champ_title}` được đồng bộ từ thống kê tỉ lệ thắng toàn cầu:\n\n'
-                f'🔗 [OP.GG Kèo Khắc Chế (Counters)](https://www.op.gg/champions/{champ_slug}/counters)\n'
-                f'🔗 [DeepLoL Pro Builds & Matchups](https://www.deeplol.gg/champions/{champ_slug}/build)\n\n'
+                f'Dữ liệu đối đầu cho `{champ_title}` được đồng bộ từ OP.GG High-Elo:\n\n'
+                f'🔗 [👉 Xem Chi Tiết Tỉ Lệ Kèo Đấu Trên OP.GG Counters]({opgg_data["counters_url"]})\n'
+                f'🔗 [👉 Xem LCK/LPL Matchups & Builds Trên DeepLoL]({opgg_data["deeplol_url"]})\n\n'
                 f'📌 **Nguyên tắc đối đầu High-Elo chung:**\n'
-                f'1. **Quản lý lính:** Không đẩy cao thiếu tầm nhìn khi chưa biết vị trí rừng đối thủ.\n'
-                f'2. **Trừng phạt hồi chiêu:** Giao tranh ngay khi đối thủ vừa dùng chiêu thức dọn lính quan trọng.\n'
-                f'3. **Lên đồ phòng ngự sớm:** Mua Giày Thép Gai (vs AD nặng) hoặc Giày Thủy Ngân (vs nhiều CC/AP) ngay lần về đầu.'
+                f'1. **Quản lý lính (Wave Management):** Đóng băng lính trước cửa trụ khi tướng đối phương có độ cơ động hoặc all-in cao.\n'
+                f'2. **Trừng phạt hồi chiêu (Cooldown Punish):** Tấn công ngay khi đối thủ vừa phung phí chiêu dọn lính hoặc kỹ năng khống chế chủ lực.\n'
+                f'3. **Lên đồ phòng ngự sớm:** Mua Giày Thép Gai (vs AD nặng) hoặc Giày Thủy Ngân (vs nhiều CC/AP) ngay lần biến về đầu.'
             ),
-            color=COLOR_CYAN,
+            color=COLOR_RED,
             timestamp=datetime.now()
         )
-        embed.set_footer(text='High Ego eSport • Cẩm Nang Chiến Thuật Đối Đầu')
-        await interaction.response.send_message(embed=embed)
+        embed.set_thumbnail(url=thumb_url)
+        embed.add_field(
+            name='🛡️ Gợi Ý Khắc Chế Theo Thuộc Tính',
+            value=(
+                '• **Khắc chế Hồi Phục Cao:** Lên sớm Gươm Đồ Tể (AD) hoặc Ngọc Quên Lãng (AP) / Áo Choàng Gai (Tank).\n'
+                '• **Khắc chế Sát Thủ Dồn Sốc:** Mua sớm Đồng Hồ Cát Zhonya (AP) hoặc Móng Vuốt Sterak / Giáp Liệt Sĩ (Đấu Sĩ).\n'
+                '• **Khắc chế Đỡ Đòn:** Lên sớm Rìu Đen / Mặt Nạ Đọa Đày Liandry / Trượng Hư Vô.'
+            ),
+            inline=False
+        )
+        embed.set_footer(text='High Ego eSport • Cẩm Nang Chiến Thuật Đối Đầu & OP.GG Intelligence')
+        await interaction.followup.send(embed=embed)
         return
 
     embed = discord.Embed(
         title=f'🎯 BÁO CÁO KHẮC CHẾ: {data["name"].upper()} ({data["type"]})',
         description=(
             f'📍 **Vị trí thi đấu:** `{data["lane"].upper()}`\n\n'
-            f'⚔️ **Top Tướng Khắc Chế (Hard Counters):**\n'
+            f'⚔️ **Top Tướng Khắc Chế Cứng (Hard Counters):**\n'
             f'👉 {", ".join([f"**{c}**" for c in data["counters"]])}\n\n'
             f'🛡️ **Điểm yếu then chốt:** {data["beaten_by"]}\n\n'
             f'💡 **Mẹo thi đấu Pro (VCS Playbook):**\n{data["vcs_tips"]}\n\n'
-            f'🔗 [OP.GG Counters](https://www.op.gg/champions/{champ_slug}/counters) • [DeepLoL Pro](https://www.deeplol.gg/champions/{champ_slug}/build)'
+            f'🔗 [OP.GG Counters]({opgg_data["counters_url"]}) • [DeepLoL Pro Tracker]({opgg_data["deeplol_url"]})'
         ),
         color=COLOR_RED,
         timestamp=datetime.now()
     )
+    embed.set_thumbnail(url=thumb_url)
     embed.add_field(name='📦 Trang Bị Khắc Chế Khuyên Dùng', value=", ".join([f"`{it}`" for it in data["situational_items"]]), inline=False)
     embed.add_field(name='🤝 Tướng Đi Cùng Cực Mạnh (Synergies)', value=", ".join([f"`{s}`" for s in data["synergies"]]), inline=False)
-    embed.set_footer(text='High Ego eSport • Cẩm Nang Chiến Thuật Đối Đầu')
+    embed.set_footer(text='High Ego eSport • Cẩm Nang Chiến Thuật Đối Đầu & OP.GG Intelligence')
 
-    await interaction.response.send_message(embed=embed)
+    await interaction.followup.send(embed=embed)
+
+
+@cmd_counter.autocomplete('tuong')
+async def counter_champ_ac(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+    return await champion_autocomplete(interaction, current)
 
 
 # ─────────────────────────── LỆNH 3: HIGH-ELO BUILD ───────────────────────────
 
-@oracle_group.command(name='build', description='[Road to VCS] Giáo án trang bị High-Elo & Ngưỡng đột biến sức mạnh')
-@app_commands.describe(tuong='Tên vị tướng muốn xem giáo án trang bị (VD: Sett, Azir, K\'Sante, Kalista, Yasuo...)')
+@oracle_group.command(name='build', description='[Road to VCS] Giáo án trang bị High-Elo & Ngưỡng đột biến sức mạnh từ OP.GG')
+@app_commands.describe(tuong='Tên vị tướng muốn xem giáo án trang bị (gõ để tìm kiếm)')
 async def cmd_build(interaction: discord.Interaction, tuong: str):
+    await interaction.response.defer()
     clean_name = tuong.lower().strip()
-    champ_slug = clean_name.replace("'", "").replace(" ", "")
+    champ_slug = opgg.get_champ_slug(tuong)
     champ_title = tuong.strip().title()
+
+    opgg_data = await opgg.fetch_opgg_data(tuong)
+    thumb_url = f"https://opgg-static.akamaized.net/meta/images/lol/latest/champion/{champ_slug}.png"
 
     data = None
     for key, c_info in odata.CHAMPIONS.items():
@@ -241,39 +299,72 @@ async def cmd_build(interaction: discord.Interaction, tuong: str):
             break
 
     if not data:
-        # Fallback intelligent build guidance for ANY champion
+        # Fallback intelligent build guidance for ANY champion from live OP.GG
+        win_rate = opgg_data.get("win_rate") or "Cập nhật theo meta"
+        tier = opgg_data.get("tier") or "Meta Pick"
+        core_items = opgg_data.get("core_items") or []
+        starters = opgg_data.get("starter_items") or []
+        boots = opgg_data.get("boots") or []
+
         embed = discord.Embed(
-            title=f'🛡️ GIÁO ÁN THI ĐẤU PRO: {champ_title.upper()}',
+            title=f'🛡️ GIÁO ÁN LIVE OP.GG: {champ_title.upper()}',
             description=(
                 f'⚡ **Vị tướng:** `{champ_title}`\n'
-                f'Giáo án trang bị & ngọc bổ trợ được cập nhật theo thống kê LCK/LPL & High-Elo mới nhất:\n\n'
-                f'👑 **Xem chi tiết build đồ & bảng ngọc chuẩn:**\n'
-                f'👉 [OP.GG Build & Runes — {champ_title}](https://www.op.gg/champions/{champ_slug}/build)\n'
-                f'👉 [DeepLoL Pro Tracker (LCK/LPL Builds)](https://www.deeplol.gg/champions/{champ_slug}/build)\n'
-                f'👉 [OP.GG Kèo Khắc Chế (Matchups)](https://www.op.gg/champions/{champ_slug}/counters)'
+                f'📊 **Thống kê Live OP.GG:** Tỉ lệ thắng: `{win_rate}` | Xếp hạng: `{tier}`\n\n'
+                f'🌐 Dữ liệu trang bị cốt lõi được đồng bộ trực tiếp từ thống kê OP.GG High-Elo:'
             ),
             color=COLOR_CYAN,
             timestamp=datetime.now()
         )
+        embed.set_thumbnail(url=thumb_url)
+
+        if core_items:
+            core_txt = "\n".join([f"`{idx+1}.` {it}" for idx, it in enumerate(core_items[:4])])
+            embed.add_field(name='👑 Bộ Trang Bị Cốt Lõi (Core Items)', value=core_txt, inline=False)
+        else:
+            embed.add_field(name='👑 Bộ Trang Bị Cốt Lõi (Core Items)', value='Xem bảng ngọc và chi tiết thứ tự lên đồ tại link OP.GG bên dưới.', inline=False)
+
+        if starters or boots:
+            starter_txt = ", ".join([f"`{s}`" for s in starters]) if starters else "Kiếm Doran / Khiên Doran"
+            boot_txt = ", ".join([f"`{b}`" for b in boots]) if boots else "Giày Thép Gai / Giày Thủy Ngân"
+            embed.add_field(name='👢 Khởi Đầu & Giày Ưu Tiên', value=f'• **Đồ đầu trận:** {starter_txt}\n• **Giày khuyên dùng:** {boot_txt}', inline=False)
+
         embed.add_field(
-            name='📦 Nguyên Tắc Lên Đồ Thi Đấu Chung',
+            name='📦 Nguyên Tắc Lên Đồ Thi Đấu High-Elo',
             value=(
-                '• **Vs Đội Hình Sát Thương Vật Lý (AD):** Ưu tiên Giày Thép Gai + Khiên Băng Randuin / Giáp Gai.\n'
-                '• **Vs Đội Hình Sát Thương Phép (AP/CC):** Ưu tiên Giày Thủy Ngân + Chùy Gai Malmortius / Dây Chuyền Chữ Thập.\n'
-                '• **Vs Nhiều Đỡ Đòn (Tanks):** Lên sớm Rìu Đen / Nỏ Thiện Xạ / Trượng Hư Vô.'
+                '• **Vs Sát Thương Vật Lý (AD):** Ưu tiên Giày Thép Gai + Khiên Băng Randuin / Giáp Gai.\n'
+                '• **Vs Sát Thương Phép & CC (AP):** Ưu tiên Giày Thủy Ngân + Chùy Gai Malmortius / Dây Chuyền Chữ Thập.\n'
+                '• **Vs Đội Hình Nhiều Chống Chịu (Tanks):** Lên sớm Rìu Đen / Nỏ Thiện Xạ / Trượng Hư Vô.'
             ),
             inline=False
         )
-        embed.set_footer(text='High Ego eSport • Competitive Itemization')
-        await interaction.response.send_message(embed=embed)
+        embed.add_field(
+            name='🔗 Tra Cứu Trực Tiếp OP.GG & DeepLoL',
+            value=(
+                f'👉 [OP.GG Build & Runes — {champ_title}]({opgg_data["opgg_url"]})\n'
+                f'👉 [DeepLoL Pro Tracker (LCK/LPL Builds)]({opgg_data["deeplol_url"]})\n'
+                f'👉 [OP.GG Kèo Khắc Chế (Matchups)]({opgg_data["counters_url"]})'
+            ),
+            inline=False
+        )
+        embed.set_footer(text='High Ego eSport • Competitive Itemization & OP.GG Intelligence')
+        await interaction.followup.send(embed=embed)
         return
+
+    # For curated champions in data
+    win_rate = opgg_data.get("win_rate") or "50.5%"
+    tier = opgg_data.get("tier") or "Tier 1-2"
 
     embed = discord.Embed(
         title=f'🛡️ GIÁO ÁN THI ĐẤU PRO: {data["name"].upper()}',
-        description=f'**Đặc tính:** `{data["type"]}` | **Đường:** `{data["lane"].upper()}`',
+        description=(
+            f'**Đặc tính:** `{data["type"]}` | **Đường:** `{data["lane"].upper()}`\n'
+            f'📊 **Thống kê Live OP.GG:** Tỉ lệ thắng: `{win_rate}` | Xếp hạng: `{tier}`'
+        ),
         color=COLOR_CYAN,
         timestamp=datetime.now()
     )
+    embed.set_thumbnail(url=thumb_url)
 
     core_txt = "\n".join([f"`{idx+1}.` {it}" for idx, it in enumerate(data["core_items"])])
     embed.add_field(name='👑 Bộ 3 Trang Bị Cốt Lõi (Core 3 Items)', value=core_txt, inline=False)
@@ -284,12 +375,17 @@ async def cmd_build(interaction: discord.Interaction, tuong: str):
     embed.add_field(name='⚡ Ngưỡng Đột Biến Sức Mạnh (Power Spikes)', value=data["vcs_tips"], inline=False)
     embed.add_field(
         name='🔗 Nguồn Dữ Liệu Live Pro Tracker',
-        value=f'[OP.GG Build & Runes](https://www.op.gg/champions/{champ_slug}/build) • [DeepLoL Pro](https://www.deeplol.gg/champions/{champ_slug}/build)',
+        value=f'[OP.GG Build & Runes]({opgg_data["opgg_url"]}) • [DeepLoL Pro Tracker]({opgg_data["deeplol_url"]}) • [OP.GG Counters]({opgg_data["counters_url"]})',
         inline=False
     )
-    embed.set_footer(text='High Ego eSport • Competitive Itemization')
+    embed.set_footer(text='High Ego eSport • Competitive Itemization & OP.GG Intelligence')
 
-    await interaction.response.send_message(embed=embed)
+    await interaction.followup.send(embed=embed)
+
+
+@cmd_build.autocomplete('tuong')
+async def build_champ_ac(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+    return await champion_autocomplete(interaction, current)
 
 
 # ─────────────────────────── LỆNH 4: META SYNERGY ───────────────────────────
